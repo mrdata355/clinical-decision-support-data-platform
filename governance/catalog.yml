@@ -1,0 +1,190 @@
+version: 1
+platform: clinical_decision_support
+
+naming:
+  databases: UPPER_SNAKE_CASE
+  schemas: UPPER_SNAKE_CASE
+  warehouse_tables: UPPER_SNAKE_CASE
+  dbt_models: lower_snake_case
+  python_modules: lower_snake_case
+  event_types: lower_snake_case
+  business_keys: lower_snake_case
+
+classifications:
+  public:
+    description: Publicly distributable metadata.
+    retention_days: null
+    access: unrestricted
+  internal:
+    description: Internal operational and analytical data without direct personal identifiers.
+    retention_days: 730
+    access: authenticated
+  pseudonymous:
+    description: Tokenized account or user identifiers that require restricted analytical access.
+    retention_days: 395
+    access: restricted_analytics
+  restricted:
+    description: Highly sensitive data requiring explicit approval and additional controls.
+    retention_days: 90
+    access: need_to_know
+
+policies:
+  - id: immutable_raw
+    description: Raw landing records are append-only and retain source metadata.
+    applies_to: [RAW]
+    requirements:
+      - ingest_run_id_required
+      - source_system_required
+      - source_updated_at_required
+      - payload_hash_required
+      - no_in_place_business_updates
+  - id: deterministic_merge
+    description: Current-state writes use stable keys and source-version ordering.
+    applies_to: [STAGING, CORE]
+    requirements:
+      - business_key_required
+      - source_version_required
+      - source_updated_at_required
+      - stale_update_rejection
+      - duplicate_event_id_protection
+  - id: publish_after_reconciliation
+    description: Serving models are released only after quality and reconciliation gates pass.
+    applies_to: [MART]
+    requirements:
+      - data_quality_pass
+      - source_target_reconciliation_pass
+      - lineage_registered
+      - freshness_within_slo
+  - id: watermark_commit
+    description: Source progress advances only after durable downstream publication.
+    applies_to: [OPS.WATERMARK]
+    requirements:
+      - raw_write_complete
+      - canonical_merge_complete
+      - reconciliation_complete
+      - serving_publish_complete
+
+assets:
+  RAW.PRODUCT_EVENT:
+    owner: data-platform
+    domain: product
+    classification: pseudonymous
+    grain: one_row_per_raw_arrival
+    primary_key: [RAW_ID]
+    natural_keys: [EVENT_ID]
+    freshness_slo_minutes: 20
+    retention_days: 90
+    tags: [raw, events, replayable]
+  RAW.CLINICAL_TOOL_SNAPSHOT:
+    owner: content-data
+    domain: clinical_content
+    classification: internal
+    grain: one_row_per_ingest_run_and_source_tool
+    primary_key: [INGEST_RUN_ID, SOURCE_TOOL_ID]
+    freshness_slo_minutes: 1440
+    retention_days: 395
+    tags: [raw, catalog]
+  RAW.CONTENT_SNAPSHOT:
+    owner: content-data
+    domain: content
+    classification: internal
+    grain: one_row_per_ingest_run_and_content_id
+    primary_key: [INGEST_RUN_ID, SOURCE_CONTENT_ID]
+    freshness_slo_minutes: 1440
+    retention_days: 395
+    tags: [raw, content]
+  STAGING.PRODUCT_EVENT:
+    owner: data-platform
+    domain: product
+    classification: pseudonymous
+    grain: one_row_per_highest_observed_event_version
+    primary_key: [EVENT_ID]
+    freshness_slo_minutes: 30
+    retention_days: 120
+    tags: [staging, normalized]
+  CORE.DIM_CLINICAL_TOOL:
+    owner: content-data
+    domain: clinical_content
+    classification: internal
+    grain: one_row_per_tool_version
+    primary_key: [CLINICAL_TOOL_KEY]
+    business_key: [TOOL_ID]
+    freshness_slo_minutes: 1440
+    retention_days: null
+    tags: [core, dimension, scd]
+  CORE.DIM_CONTENT:
+    owner: content-data
+    domain: content
+    classification: internal
+    grain: one_row_per_content_version
+    primary_key: [CONTENT_KEY]
+    business_key: [CONTENT_ID]
+    freshness_slo_minutes: 1440
+    retention_days: null
+    tags: [core, dimension, scd]
+  CORE.DIM_ACCOUNT:
+    owner: data-platform
+    domain: identity
+    classification: pseudonymous
+    grain: one_row_per_account_token
+    primary_key: [ACCOUNT_KEY]
+    business_key: [ACCOUNT_TOKEN]
+    freshness_slo_minutes: 60
+    retention_days: 395
+    tags: [core, dimension]
+  CORE.FCT_PRODUCT_EVENT:
+    owner: data-platform
+    domain: product
+    classification: pseudonymous
+    grain: one_row_per_event_id
+    primary_key: [EVENT_ID]
+    freshness_slo_minutes: 30
+    retention_days: 395
+    tags: [core, fact]
+  MART.TOOL_ENGAGEMENT_DAILY:
+    owner: analytics
+    domain: product
+    classification: internal
+    grain: one_row_per_date_tool_channel_country
+    primary_key: [EVENT_DATE, CLINICAL_TOOL_KEY, CHANNEL, COUNTRY_CODE]
+    freshness_slo_minutes: 60
+    retention_days: null
+    tags: [mart, product, business_facing]
+  OPS.PIPELINE_RUN:
+    owner: data-platform
+    domain: platform
+    classification: internal
+    grain: one_row_per_pipeline_run
+    primary_key: [RUN_ID]
+    freshness_slo_minutes: 5
+    retention_days: 395
+    tags: [ops, audit]
+  OPS.RECONCILIATION_RESULT:
+    owner: data-platform
+    domain: platform
+    classification: internal
+    grain: one_row_per_run_and_control
+    primary_key: [RUN_ID, CONTROL_NAME]
+    freshness_slo_minutes: 5
+    retention_days: 395
+    tags: [ops, quality]
+
+lineage:
+  - from: RAW.PRODUCT_EVENT
+    to: STAGING.PRODUCT_EVENT
+    transformation: schema_validation_normalization_version_dedupe
+  - from: RAW.CLINICAL_TOOL_SNAPSHOT
+    to: CORE.DIM_CLINICAL_TOOL
+    transformation: catalog_conformance_version_resolution
+  - from: RAW.CONTENT_SNAPSHOT
+    to: CORE.DIM_CONTENT
+    transformation: content_conformance_version_resolution
+  - from: STAGING.PRODUCT_EVENT
+    to: CORE.FCT_PRODUCT_EVENT
+    transformation: dimension_resolution_deterministic_merge
+  - from: CORE.DIM_CLINICAL_TOOL
+    to: CORE.FCT_PRODUCT_EVENT
+    transformation: surrogate_key_resolution
+  - from: CORE.FCT_PRODUCT_EVENT
+    to: MART.TOOL_ENGAGEMENT_DAILY
+    transformation: daily_product_aggregation
