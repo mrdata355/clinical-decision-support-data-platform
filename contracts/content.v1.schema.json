@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/clinical-data/content.v1.json",
+  "title": "Clinical Content V1",
+  "$comment": "Portfolio/reference contract modeled from publicly documented clinical-decision-support product concepts; not an MDCalc internal schema.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["content_id", "content_type", "title", "publication_status", "source_version", "source_updated_at"],
+  "properties": {
+    "content_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "content_type": {"type": "string", "enum": ["when_to_use", "pearls_pitfalls", "why_use", "next_steps", "evidence", "formula", "guideline_summary", "decision_aid", "creator_insight", "cme_module", "editorial"]},
+    "title": {"type": "string", "minLength": 1, "maxLength": 512},
+    "summary": {"type": ["string", "null"], "maxLength": 4000},
+    "body_ref": {"type": ["string", "null"], "maxLength": 1024},
+    "tool_ids": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "specialties": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "condition_groups": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "society_id": {"type": ["string", "null"], "maxLength": 128},
+    "guideline_publication_date": {"type": ["string", "null"], "format": "date"},
+    "evidence_reference_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "contributor_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "cme_eligible": {"type": "boolean", "default": false},
+    "cme_credit_hours": {"type": ["number", "null"], "minimum": 0},
+    "review_status": {"type": "string", "enum": ["draft", "clinical_review", "editorial_review", "approved", "retired"]},
+    "reviewed_at": {"type": ["string", "null"], "format": "date-time"},
+    "publication_status": {"type": "string", "enum": ["draft", "review", "published", "retired"]},
+    "first_published_at": {"type": ["string", "null"], "format": "date-time"},
+    "source_version": {"type": "integer", "minimum": 1},
+    "source_updated_at": {"type": "string", "format": "date-time"}
+  }
+}
