@@ -1,0 +1,56 @@
+name: clinical_data_platform
+version: '1.0.0'
+config-version: 2
+
+profile: clinical_data_platform
+
+model-paths: ['models']
+analysis-paths: ['analyses']
+test-paths: ['tests']
+seed-paths: ['seeds']
+macro-paths: ['macros']
+snapshot-paths: ['snapshots']
+
+target-path: target
+clean-targets: ['target', 'dbt_packages']
+
+models:
+  clinical_data_platform:
+    +materialized: view
+    staging:
+      +schema: STAGING_DBT
+      +materialized: view
+      +tags: ['staging']
+    intermediate:
+      +schema: INTERMEDIATE
+      +materialized: ephemeral
+      +tags: ['intermediate']
+    core:
+      +schema: CORE_DBT
+      +materialized: incremental
+      +incremental_strategy: merge
+      +on_schema_change: append_new_columns
+      +tags: ['core']
+    marts:
+      +schema: MART_DBT
+      +materialized: table
+      +tags: ['mart']
+
+snapshots:
+  clinical_data_platform:
+    +target_schema: SNAPSHOTS
+    +strategy: timestamp
+
+seeds:
+  clinical_data_platform:
+    +schema: REFERENCE
+    +quote_columns: false
+
+vars:
+  product_event_lookback_hours: 48
+  late_arrival_days: 7
+  default_country_code: 'ZZ'
+
+query-comment:
+  comment: "clinical-data-platform dbt model={{ node.name }} invocation={{ invocation_id }}"
+  append: true
