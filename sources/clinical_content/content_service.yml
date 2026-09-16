@@ -4,47 +4,67 @@ transport: https_snapshot
 owner: content-engineering
 cadence: daily_plus_incremental
 classification: internal
+reference_scope: public_product_concepts_only
 
 objects:
   clinical_tool:
     key: tool_id
     schema: contracts/clinical_tool.v1.schema.json
-    required_fields:
-      - tool_id
-      - tool_slug
-      - tool_name
-      - primary_specialty
-      - publication_status
-      - source_version
-      - source_updated_at
+    required_fields: [tool_id, tool_slug, tool_name, tool_type, primary_specialty, publication_status, source_version, source_updated_at]
+    nested_assets: [inputs, result_contract, creator_ids, contributor_ids, evidence_reference_ids, guideline_reference_ids, quality_rating]
     scd_strategy: type_2
     precedence: [source_version_desc, source_updated_at_desc]
   content:
     key: content_id
-    required_fields:
-      - content_id
-      - content_type
-      - publication_status
-      - source_version
-      - source_updated_at
+    schema: contracts/content.v1.schema.json
+    content_types: [when_to_use, pearls_pitfalls, why_use, next_steps, evidence, formula, guideline_summary, decision_aid, creator_insight, cme_module, editorial]
+    required_fields: [content_id, content_type, title, publication_status, source_version, source_updated_at]
     scd_strategy: type_2
     precedence: [source_version_desc, source_updated_at_desc]
+  quality_rating:
+    key: rating_id
+    schema: contracts/quality_rating.v1.schema.json
+    required_fields: [rating_id, tool_id, rating_version, overall_score, scientific_soundness_score, importance_score, usability_feasibility_score, effective_at, source_version, source_updated_at]
+    scd_strategy: type_2
+    precedence: [source_version_desc, source_updated_at_desc]
+  specialty_taxonomy:
+    key: specialty_slug
+    required_fields: [specialty_slug, specialty_name, source_version, source_updated_at]
+    scd_strategy: type_2
+  condition_taxonomy:
+    key: condition_slug
+    required_fields: [condition_slug, condition_name, source_version, source_updated_at]
+    scd_strategy: type_2
+  contributor:
+    key: contributor_id
+    required_fields: [contributor_id, display_name, contributor_type, source_version, source_updated_at]
+    allowed_types: [creator, contributor, reviewer, editor, society]
+    scd_strategy: type_2
 
 watermark:
   field: source_updated_at
   interval: closed_open
   full_snapshot_schedule: daily
   incremental_schedule: hourly
+  late_arrival_lookback_hours: 72
   commit_after_reconciliation: true
 
 quality:
   max_missing_business_key_ratio: 0
   max_unknown_publication_status_ratio: 0
   max_duplicate_current_version_ratio: 0
+  max_orphan_tool_content_ratio: 0
+  max_orphan_quality_rating_tool_ratio: 0
+  quality_rating_component_sum_tolerance: 0.01
   require_monotonic_source_version: true
+  require_published_tool_evidence_reference: true
+  require_single_current_scd_row: true
 
 observability:
   freshness_slo_minutes: 1440
   monitor_specialty_distribution: true
+  monitor_tool_type_distribution: true
   monitor_publication_status_distribution: true
+  monitor_quality_rating_distribution: true
   monitor_snapshot_row_count_change_ratio: true
+  monitor_orphan_references: true
