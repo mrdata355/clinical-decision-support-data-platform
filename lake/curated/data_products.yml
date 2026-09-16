@@ -1,0 +1,194 @@
+version: 1
+zone: curated
+purpose: business_serving_data_products
+
+path_convention: >-
+  s3://clinical-data-{env}-curated/{data_product}/business_date={yyyy-mm-dd}/
+
+publication:
+  source_zone: merge
+  require_quality_gate: true
+  require_reconciliation_gate: true
+  require_lineage_registration: true
+  publish_atomic_partitions: true
+  preserve_previous_successful_partition_until_commit: true
+
+products:
+  product_usage_daily:
+    owner: analytics
+    grain: one_row_per_date_channel_country
+    dimensions:
+      - event_date
+      - channel
+      - country_code
+    measures:
+      - sessions_started
+      - searches
+      - tool_views
+      - tool_starts
+      - tool_completions
+      - content_views
+      - unique_users
+      - unique_accounts
+      - completion_rate
+    freshness_slo_minutes: 60
+    consumers:
+      - product_analytics
+      - operations
+      - executive_reporting
+  tool_engagement_daily:
+    owner: analytics
+    grain: one_row_per_date_tool_channel_country
+    dimensions:
+      - event_date
+      - clinical_tool_key
+      - tool_id
+      - tool_name
+      - primary_specialty
+      - condition_group
+      - channel
+      - country_code
+    measures:
+      - tool_views
+      - tool_starts
+      - tool_completions
+      - favorite_adds
+      - favorite_removes
+      - net_favorite_change
+      - unique_users
+      - unique_accounts
+      - sessions
+      - view_to_start_rate
+      - start_to_complete_rate
+      - view_to_complete_rate
+      - completions_per_session
+      - views_per_user
+      - rolling_7d_avg_views
+      - rolling_7d_avg_completions
+      - rolling_28d_avg_users
+    freshness_slo_minutes: 60
+    consumers:
+      - product
+      - analytics
+      - content
+  specialty_engagement_daily:
+    owner: analytics
+    grain: one_row_per_date_specialty_channel
+    dimensions:
+      - event_date
+      - primary_specialty
+      - channel
+    measures:
+      - unique_users
+      - unique_accounts
+      - sessions
+      - tool_views
+      - tool_starts
+      - tool_completions
+      - completion_rate
+    freshness_slo_minutes: 60
+    consumers:
+      - product
+      - content
+      - leadership
+  content_engagement_daily:
+    owner: analytics
+    grain: one_row_per_date_content_channel
+    dimensions:
+      - event_date
+      - content_key
+      - content_type
+      - specialty
+      - channel
+    measures:
+      - views
+      - unique_users
+      - unique_sessions
+      - views_per_user
+    freshness_slo_minutes: 120
+    consumers:
+      - content
+      - product
+  integration_activity_daily:
+    owner: data-platform
+    grain: one_row_per_date_integration
+    dimensions:
+      - event_date
+      - integration_id
+    measures:
+      - launches
+      - unique_tools
+      - unique_accounts
+      - unique_users
+      - failure_events
+      - success_rate
+    freshness_slo_minutes: 60
+    consumers:
+      - engineering
+      - product
+      - operations
+  search_behavior_daily:
+    owner: analytics
+    grain: one_row_per_date_query_token_channel
+    dimensions:
+      - event_date
+      - search_query_token
+      - channel
+    measures:
+      - searches
+      - unique_users
+      - downstream_tool_views
+      - downstream_tool_starts
+      - downstream_tool_completions
+      - search_to_tool_rate
+    freshness_slo_minutes: 120
+    consumers:
+      - product
+      - content
+  pipeline_reliability_daily:
+    owner: data-platform
+    grain: one_row_per_date_pipeline
+    dimensions:
+      - event_date
+      - pipeline_name
+    measures:
+      - run_count
+      - success_count
+      - failed_count
+      - success_rate
+      - p50_duration_seconds
+      - p95_duration_seconds
+      - source_rows
+      - quarantined_rows
+      - quarantine_rate
+      - reconciliation_failures
+      - freshness_breach_count
+    freshness_slo_minutes: 30
+    consumers:
+      - engineering
+      - operations
+
+semantic_rules:
+  rates:
+    zero_denominator_result: null
+    precision: 6
+  unique_users:
+    source: pseudonymous_user_token
+    never_reconstruct_identity: true
+  time:
+    warehouse_timezone: UTC
+    reporting_date: event_date_utc
+    local_time_conversion: consumer_layer_only
+
+serving:
+  snowflake:
+    database: CLINICAL_ANALYTICS
+    schema: MART
+  file_exports:
+    allowed: true
+    format: parquet
+    classification_limit: internal
+  api_exports:
+    allowed: true
+    require_contract: true
+    require_access_policy: true
