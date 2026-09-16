@@ -1,0 +1,55 @@
+version: 1
+purpose: governed_natural_language_to_analytics_sql
+
+policy:
+  read_only: true
+  allowed_schemas: [MART, OPS]
+  denied_schemas: [RAW, STAGING]
+  deny_select_star: true
+  max_rows: 500
+  statement_timeout_seconds: 20
+  prohibit_keywords: [INSERT, UPDATE, DELETE, MERGE, COPY, PUT, GET, REMOVE, ALTER, DROP, TRUNCATE, CREATE, GRANT, REVOKE, CALL]
+  direct_identifier_columns_denied: [NAME, EMAIL, PHONE, MRN, PATIENT_ID, DOB, ADDRESS]
+  generated_sql_requires_validation: true
+
+reports:
+  tool_funnel:
+    description: Tool views, starts, completions and conversion by day/tool/specialty/channel.
+    objects: [MART.DT_LIVE_TOOL_FUNNEL]
+    dimensions: [EVENT_DATE, TOOL_ID, TOOL_NAME, PRIMARY_SPECIALTY, CHANNEL, COUNTRY_CODE]
+    measures: [TOOL_VIEWS, TOOL_STARTS, TOOL_COMPLETIONS, VIEW_TO_START_RATE, START_TO_COMPLETE_RATE]
+    example_questions:
+      - Which calculators had the largest completion growth this week?
+      - Show completion rate by specialty and channel.
+  search_discovery:
+    description: Search volume and downstream clinical-tool discovery.
+    objects: [MART.DT_LIVE_SEARCH_DISCOVERY]
+    dimensions: [EVENT_DATE, CHANNEL, COUNTRY_CODE]
+    measures: [SEARCHES, SEARCH_RESULT_CLICKS, TOOL_VIEWS, TOOL_COMPLETIONS, UNIQUE_QUERY_TOKENS, UNIQUE_USERS]
+    example_questions:
+      - Is search converting into tool usage?
+      - Compare search discovery by channel.
+  ehr_integration:
+    description: De-identified EHR integration launches, context opens, autofill and writeback telemetry.
+    objects: [MART.DT_LIVE_EHR_INTEGRATION]
+    dimensions: [EVENT_DATE, INTEGRATION_ID]
+    measures: [LAUNCHES, CONTEXT_OPENS, AUTOFILL_EVENTS, WRITEBACKS, AUTOFILL_FIELDS, CONFIRMED_FIELDS, CONFIRMATION_RATE]
+    example_questions:
+      - Which integration has the lowest autofill confirmation rate?
+      - Show writeback adoption over time.
+  pipeline_health:
+    description: Continuous pipeline freshness, failures and quarantine health.
+    objects: [OPS.DT_CONTINUOUS_PIPELINE_SLO]
+    dimensions: [PIPELINE_NAME]
+    measures: [LAST_SOURCE_COUNT, FRESHNESS_SECONDS, QUARANTINE_RATIO, FAILURES_24H]
+    example_questions:
+      - Which pipeline is stale right now?
+      - Show pipelines with failures in the last 24 hours.
+  recommendation_performance:
+    description: Recommendation model impressions, clicks and attributed conversions.
+    objects: [MART_DBT.FCT_RECOMMENDATION_PERFORMANCE_DAILY]
+    dimensions: [EVENT_DATE, MODEL_NAME, MODEL_VERSION]
+    measures: [IMPRESSIONS, CLICKS, ATTRIBUTED_TOOL_STARTS, ATTRIBUTED_TOOL_COMPLETIONS, CTR, CLICK_TO_COMPLETION_RATE]
+    example_questions:
+      - Compare the latest recommendation model versions.
+      - Show CTR and completion conversion for the last seven days.
