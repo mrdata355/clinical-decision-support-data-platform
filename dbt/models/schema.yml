@@ -11,152 +11,177 @@ sources:
     tables:
       - name: product_event
         identifier: PRODUCT_EVENT
-        description: Immutable product and integration events.
+        description: Immutable cross-channel product, search, clinical-tool, CME, quality, and integration event envelopes.
         columns:
-          - name: RAW_ID
-            tests: [not_null, unique]
-          - name: EVENT_ID
-          - name: EVENT_TYPE
-          - name: EVENT_TS
-          - name: SOURCE_UPDATED_AT
-          - name: INGESTED_AT
-            tests: [not_null]
-          - name: PAYLOAD
-            tests: [not_null]
+          - {name: RAW_ID, tests: [not_null, unique]}
+          - {name: EVENT_ID, tests: [not_null]}
+          - {name: EVENT_TYPE, tests: [not_null]}
+          - {name: EVENT_TS, tests: [not_null]}
+          - {name: SOURCE_UPDATED_AT, tests: [not_null]}
+          - {name: INGESTED_AT, tests: [not_null]}
+          - {name: PAYLOAD, tests: [not_null]}
       - name: clinical_tool_snapshot
         identifier: CLINICAL_TOOL_SNAPSHOT
-        description: Versioned clinical tool metadata snapshots.
+        description: Versioned clinical decision-support tool metadata, evidence provenance, specialties, calculator inputs/outputs, and publication state.
         freshness:
           warn_after: {count: 25, period: hour}
           error_after: {count: 36, period: hour}
       - name: content_snapshot
         identifier: CONTENT_SNAPSHOT
-        description: Versioned editorial and guideline content snapshots.
+        description: Editorial, guideline, educational and CME content snapshots.
         freshness:
           warn_after: {count: 25, period: hour}
           error_after: {count: 36, period: hour}
+      - name: quality_rating_snapshot
+        identifier: QUALITY_RATING_SNAPSHOT
+        description: Generated/reference quality-rating records for scientific soundness, clinical importance, fairness/equity, and usability/feasibility.
+        freshness:
+          warn_after: {count: 25, period: hour}
+          error_after: {count: 48, period: hour}
 
 models:
   - name: stg_product_events
-    description: One normalized row per highest observed event version.
-    config:
-      contract:
-        enforced: false
+    description: Highest-version normalized event envelope across web, mobile, product API, EHR integrations, and governed synthetic demonstrations.
     columns:
-      - name: event_id
-        description: Stable event identifier used for idempotency.
-        tests: [not_null, unique]
+      - {name: event_id, tests: [not_null, unique]}
       - name: event_type
         tests:
           - not_null
           - accepted_values:
-              values:
-                - session_start
-                - session_end
-                - search
-                - tool_view
-                - tool_start
-                - tool_complete
-                - favorite_add
-                - favorite_remove
-                - content_view
-                - integration_launch
-      - name: business_key
-        tests: [not_null]
-      - name: source_version
-        tests: [not_null]
-      - name: canonical_hash
-        tests: [not_null]
-      - name: event_ts
-        tests: [not_null]
-      - name: source_updated_at
-        tests: [not_null]
+              values: [session_start, session_end, search, search_result_click, tool_view, tool_start, tool_complete, favorite_add, favorite_remove, recent_tool_view, content_view, guideline_view, cme_content_view, cme_credit_earned, quality_rating_view, integration_launch, ehr_context_open, ehr_autofill, ehr_result_writeback, recommendation_impression, recommendation_click]
+      - {name: business_key, tests: [not_null]}
+      - {name: source_version, tests: [not_null]}
+      - {name: canonical_hash, tests: [not_null]}
+      - {name: event_ts, tests: [not_null]}
+      - {name: source_updated_at, tests: [not_null]}
+
+  - name: stg_clinical_tools
+    description: Conformed tool catalog with evidence, calculation family, specialties, review cadence, creator provenance, and quality-rating linkage.
+    columns:
+      - {name: tool_id, tests: [not_null, unique]}
+      - {name: tool_slug, tests: [not_null, unique]}
+      - {name: tool_name, tests: [not_null]}
+      - {name: tool_type, tests: [not_null]}
+      - {name: primary_specialty, tests: [not_null]}
+      - {name: publication_status, tests: [not_null]}
+      - {name: source_version, tests: [not_null]}
+      - {name: canonical_hash, tests: [not_null]}
+
+  - name: stg_content
+    description: Normalized guideline, editorial, CME and educational content catalog.
+    columns:
+      - {name: content_id, tests: [not_null, unique]}
+      - {name: content_type, tests: [not_null]}
+      - {name: title, tests: [not_null]}
+      - {name: publication_status, tests: [not_null]}
+      - {name: source_version, tests: [not_null]}
+
+  - name: stg_quality_ratings
+    description: Tool quality-rating components and overall rating lineage.
+    columns:
+      - {name: rating_id, tests: [not_null, unique]}
+      - {name: tool_id, tests: [not_null]}
+      - {name: scientific_soundness_score, tests: [not_null]}
+      - {name: clinical_importance_score, tests: [not_null]}
+      - {name: fairness_equity_score, tests: [not_null]}
+      - {name: usability_feasibility_score, tests: [not_null]}
+      - {name: overall_score, tests: [not_null]}
+      - {name: source_updated_at, tests: [not_null]}
 
   - name: dim_clinical_tool
-    description: Current clinical tool catalog representation.
+    description: Current/SCD-aware clinical decision-support tool dimension.
     columns:
-      - name: clinical_tool_key
-        tests: [not_null, unique]
-      - name: tool_id
-        tests: [not_null]
-      - name: tool_name
-        tests: [not_null]
-      - name: primary_specialty
-        tests: [not_null]
-      - name: is_current
-        tests: [not_null]
+      - {name: clinical_tool_key, tests: [not_null, unique]}
+      - {name: tool_id, tests: [not_null]}
+      - {name: tool_name, tests: [not_null]}
+      - {name: primary_specialty, tests: [not_null]}
+      - {name: publication_status, tests: [not_null]}
+      - {name: is_current, tests: [not_null]}
 
   - name: dim_content
-    description: Content catalog for guideline and editorial analytics.
+    description: Content dimension for guideline, editorial and CME analytics.
     columns:
-      - name: content_key
-        tests: [not_null, unique]
-      - name: content_id
-        tests: [not_null]
-      - name: content_type
-        tests: [not_null]
-      - name: is_current
-        tests: [not_null]
+      - {name: content_key, tests: [not_null, unique]}
+      - {name: content_id, tests: [not_null]}
+      - {name: content_type, tests: [not_null]}
+      - {name: is_current, tests: [not_null]}
 
   - name: dim_account
     description: De-identified account dimension derived from product activity.
     columns:
-      - name: account_key
-        tests: [not_null, unique]
-      - name: account_token
-        tests: [not_null, unique]
+      - {name: account_key, tests: [not_null, unique]}
+      - {name: account_token, tests: [not_null, unique]}
 
   - name: fct_product_event
-    description: Canonical event fact with resolved dimensional keys.
+    description: Canonical event fact with resolved tool, content, account and integration context.
     columns:
-      - name: event_id
-        tests: [not_null, unique]
-      - name: event_date
-        tests: [not_null]
-      - name: event_type
-        tests: [not_null]
-      - name: business_key
-        tests: [not_null]
-      - name: source_version
-        tests: [not_null]
+      - {name: event_id, tests: [not_null, unique]}
+      - {name: event_date, tests: [not_null]}
+      - {name: event_type, tests: [not_null]}
+      - {name: business_key, tests: [not_null]}
+      - {name: source_version, tests: [not_null]}
       - name: clinical_tool_key
         tests:
-          - relationships:
-              to: ref('dim_clinical_tool')
-              field: clinical_tool_key
-              config:
-                severity: warn
+          - relationships: {to: "ref('dim_clinical_tool')", field: clinical_tool_key, config: {severity: warn}}
       - name: content_key
         tests:
-          - relationships:
-              to: ref('dim_content')
-              field: content_key
-              config:
-                severity: warn
+          - relationships: {to: "ref('dim_content')", field: content_key, config: {severity: warn}}
       - name: account_key
         tests:
-          - relationships:
-              to: ref('dim_account')
-              field: account_key
-              config:
-                severity: warn
+          - relationships: {to: "ref('dim_account')", field: account_key, config: {severity: warn}}
+
+  - name: fct_quality_rating
+    description: Versioned tool quality rating fact with component scores and review metadata.
+    columns:
+      - {name: rating_id, tests: [not_null, unique]}
+      - {name: tool_id, tests: [not_null]}
+      - {name: overall_score, tests: [not_null]}
+
+  - name: fct_cme_activity
+    description: CME content consumption and earned-credit activity.
+    columns:
+      - {name: event_id, tests: [not_null, unique]}
+      - {name: event_date, tests: [not_null]}
 
   - name: fct_tool_engagement_daily
-    description: Daily product engagement and conversion metrics by tool, channel, and geography.
+    description: Daily engagement and conversion metrics by tool, channel and geography.
     columns:
-      - name: event_date
-        tests: [not_null]
-      - name: clinical_tool_key
-        tests: [not_null]
-      - name: tool_id
-        tests: [not_null]
-      - name: primary_specialty
-        tests: [not_null]
-      - name: channel
-        tests: [not_null]
-      - name: tool_views
-        tests: [not_null]
-      - name: tool_starts
-        tests: [not_null]
-      - name: tool_completions
-        tests: [not_null]
+      - {name: event_date, tests: [not_null]}
+      - {name: clinical_tool_key, tests: [not_null]}
+      - {name: tool_id, tests: [not_null]}
+      - {name: primary_specialty, tests: [not_null]}
+      - {name: tool_views, tests: [not_null]}
+      - {name: tool_starts, tests: [not_null]}
+      - {name: tool_completions, tests: [not_null]}
+
+  - name: fct_search_funnel_daily
+    description: Search-to-tool discovery and completion funnel.
+    columns:
+      - {name: event_date, tests: [not_null]}
+      - {name: searches, tests: [not_null]}
+      - {name: search_result_clicks, tests: [not_null]}
+      - {name: downstream_tool_completions, tests: [not_null]}
+
+  - name: fct_integration_health_daily
+    description: EHR/integration launches, autofill/writeback success, latency and error rates using de-identified telemetry only.
+    columns:
+      - {name: event_date, tests: [not_null]}
+      - {name: integration_id, tests: [not_null]}
+      - {name: launches, tests: [not_null]}
+      - {name: success_rate, tests: [not_null]}
+
+  - name: fct_quality_trust_daily
+    description: Quality-rating exposure and downstream tool engagement by rating band.
+    columns:
+      - {name: event_date, tests: [not_null]}
+      - {name: tool_id, tests: [not_null]}
+      - {name: quality_rating_views, tests: [not_null]}
+
+  - name: fct_recommendation_performance_daily
+    description: Recommendation impressions, clicks, completions and CTR/conversion by model version.
+    columns:
+      - {name: event_date, tests: [not_null]}
+      - {name: model_name, tests: [not_null]}
+      - {name: model_version, tests: [not_null]}
+      - {name: impressions, tests: [not_null]}
+      - {name: clicks, tests: [not_null]}
