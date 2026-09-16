@@ -1,0 +1,46 @@
+source: integration_gateway
+domain: integrations
+transport: https_event_export
+owner: integrations-engineering
+cadence: every_15_minutes
+classification: pseudonymous
+
+objects:
+  integration_launch:
+    key: event_id
+    required_fields:
+      - event_id
+      - integration_id
+      - tool_id
+      - event_ts
+      - source_updated_at
+      - source_version
+    optional_fields:
+      - account_token
+      - user_token
+      - launch_context
+      - channel
+      - country_code
+
+watermark:
+  field: source_updated_at
+  interval: closed_open
+  commit_after_reconciliation: true
+  replay_supported: true
+
+idempotency:
+  stable_event_id_required: true
+  dedupe_key: event_id
+  precedence: [source_version_desc, source_updated_at_desc]
+
+quality:
+  max_missing_event_id_ratio: 0
+  max_missing_integration_id_ratio: 0
+  max_missing_tool_id_ratio: 0.001
+  max_unknown_schema_version_ratio: 0
+
+observability:
+  freshness_slo_minutes: 30
+  monitor_launches_by_integration: true
+  monitor_success_failure_ratio: true
+  monitor_source_lag: true
