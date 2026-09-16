@@ -1,15 +1,12 @@
-version: 1
+version: 2
 zone: merge
-purpose: deterministic_current_state_and_history
+purpose: deterministic_current_state_history_and_event_accounting
 
 path_convention: >-
   s3://clinical-data-{env}-merge/{domain}/{entity}/business_date={yyyy-mm-dd}/run_id={run_id}/
 
 ordering:
-  precedence:
-    - source_version_desc
-    - source_updated_at_desc
-    - event_id_desc
+  precedence: [source_version_desc, source_updated_at_desc, event_id_desc]
   reject_older_versions: true
   stable_tie_breaker: event_id
   arrival_time_is_not_business_precedence: true
@@ -19,15 +16,9 @@ entities:
     match_key: [event_id]
     source_version_field: source_version
     source_updated_at_field: source_updated_at
-    history: append_all_accepted_versions
+    history: append_all_raw_versions
     current_state: highest_version_wins
-    outcomes:
-      - inserted
-      - updated
-      - unchanged
-      - duplicate
-      - stale
-      - quarantined
+    outcomes: [inserted, updated, unchanged, duplicate, stale, quarantined]
   clinical_tool:
     match_key: [tool_id]
     source_version_field: source_version
@@ -35,13 +26,8 @@ entities:
     history: type_2
     current_state: is_current_flag
     effective_fields: [valid_from, valid_to, is_current]
-    outcomes:
-      - inserted
-      - version_closed
-      - version_opened
-      - unchanged
-      - stale
-      - quarantined
+    version_change_detection: canonical_hash
+    outcomes: [inserted, version_closed, version_opened, unchanged, stale, quarantined]
   content:
     match_key: [content_id]
     source_version_field: source_version
@@ -49,27 +35,34 @@ entities:
     history: type_2
     current_state: is_current_flag
     effective_fields: [valid_from, valid_to, is_current]
+  quality_rating:
+    match_key: [rating_id]
+    source_version_field: source_version
+    source_updated_at_field: source_updated_at
+    history: type_2
+    current_state: is_current_flag
+    effective_fields: [effective_at, valid_to, is_current]
+    additional_uniqueness: [tool_id, rating_version]
   account:
     match_key: [account_token]
     source_version_field: source_version
     source_updated_at_field: source_updated_at
     history: current_only
     current_state: highest_version_wins
+  ehr_integration_event:
+    match_key: [event_id]
+    source_version_field: source_version
+    source_updated_at_field: source_updated_at
+    history: append_all_accepted_versions
+    current_state: highest_version_wins
 
 idempotency:
-  event_ledger:
-    key: event_id
-    action_on_seen: duplicate
-    retain_days: 395
-  run_ledger:
-    key: run_id
-    prevent_double_commit: true
+  event_ledger: {key: event_id, action_on_seen: duplicate, retain_days: 395}
+  run_ledger: {key: run_id, prevent_double_commit: true}
+  completion_ledger: {key: completion_id, action_on_seen: duplicate}
   canonical_hash:
     algorithm: sha256
-    exclude_fields:
-      - ingested_at
-      - normalized_at
-      - trace_id
+    exclude_fields: [ingested_at, normalized_at, trace_id]
     action_on_equal_hash_same_version: unchanged
 
 transactionality:
@@ -78,18 +71,27 @@ transactionality:
   merge_and_audit_same_transaction: true
   watermark_commit_after_transaction: true
   retry_safe: true
+  partial_publish_forbidden: true
 
 reconciliation:
   terminal_equation: >-
     source_count = inserted + updated + unchanged + duplicate + stale + quarantined
   fail_on_unexplained_rows: true
   controls:
-    - distinct_business_keys
-    - source_target_row_count
+    - raw_to_clean_distinct_event_ids
+    - clean_to_core_distinct_event_ids
     - canonical_identity_hash
     - event_type_distribution
     - specialty_distribution
-    - daily_usage_aggregate
+    - tool_usage_daily
+    - quality_rating_component_sum
+    - quality_rating_current_uniqueness
+    - content_publication_status_distribution
+    - cme_credit_hours_sum
+    - ehr_launch_autofill_writeback_funnel
+    - orphan_tool_reference_count
+    - orphan_content_reference_count
+    - watermark_continuity
 
 late_arrivals:
   supported: true
@@ -98,33 +100,26 @@ late_arrivals:
   processing_time_never_replaces_event_time: true
   repartition_affected_dates_only: true
 
-history:
-  clinical_tool:
-    close_existing_when:
-      - incoming_version_is_newer
-      - canonical_hash_changed
-    close_timestamp: incoming_source_updated_at
-    open_timestamp: incoming_source_updated_at
-    preserve_source_version: true
-  content:
-    close_existing_when:
-      - incoming_version_is_newer
-      - canonical_hash_changed
-    close_timestamp: incoming_source_updated_at
-    open_timestamp: incoming_source_updated_at
+scd2:
+  enforce_single_current_row: true
+  disallow_overlapping_effective_windows: true
+  close_timestamp: incoming_source_updated_at
+  open_timestamp: incoming_source_updated_at
+  preserve_source_version: true
+  entities: [clinical_tool, content, quality_rating]
 
 rollback:
   retain_pre_merge_snapshot: true
   snapshot_scope: affected_business_keys
   write_merge_audit: true
-  merge_audit_fields:
-    - run_id
-    - entity
-    - business_key
-    - event_id
-    - source_version
-    - prior_version
-    - outcome
-    - canonical_hash
-    - prior_hash
-    - merged_at
+  merge_audit_fields: [run_id, entity, business_key, event_id, source_version, prior_version, outcome, canonical_hash, prior_hash, merged_at]
+
+continuous_query_contract:
+  checkpoint_every_seconds: 60
+  max_uncommitted_age_seconds: 300
+  emit_operational_snapshot: true
+  snapshot_models: [OPS.V_PIPELINE_HEALTH, OPS.V_RECONCILIATION_HEALTH, MART.V_TOOL_ENGAGEMENT_REALTIME]
+  exactly_once_boundary: event_id_plus_source_version
+  backpressure:
+    max_lag_seconds: 120
+    pause_publication_seconds: 300
