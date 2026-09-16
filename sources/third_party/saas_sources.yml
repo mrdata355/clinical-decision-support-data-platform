@@ -5,36 +5,47 @@ sources:
     cadence: hourly
     classification: internal
     objects:
-      subscription:
-        key: subscription_id
-        updated_at: source_updated_at
-      invoice:
-        key: invoice_id
-        updated_at: source_updated_at
-    watermark:
-      interval: closed_open
-      commit_after_reconciliation: true
+      subscription: {key: subscription_id, updated_at: source_updated_at}
+      invoice: {key: invoice_id, updated_at: source_updated_at}
+      payment: {key: payment_id, updated_at: source_updated_at}
+    watermark: {interval: closed_open, commit_after_reconciliation: true}
   crm:
     domain: business
     transport: https
     cadence: hourly
     classification: internal
     objects:
-      organization:
-        key: organization_id
-        updated_at: source_updated_at
-      account_relationship:
-        key: relationship_id
-        updated_at: source_updated_at
+      organization: {key: organization_id, updated_at: source_updated_at}
+      account_relationship: {key: relationship_id, updated_at: source_updated_at}
+      enterprise_contract: {key: contract_id, updated_at: source_updated_at}
   support_platform:
     domain: operations
     transport: https
     cadence: hourly
     classification: internal
     objects:
-      support_case:
-        key: case_id
-        updated_at: source_updated_at
+      support_case: {key: case_id, updated_at: source_updated_at}
+      product_feedback: {key: feedback_id, updated_at: source_updated_at}
+  cme_fulfillment:
+    domain: education
+    transport: https
+    cadence: hourly
+    classification: pseudonymous
+    objects:
+      entitlement: {key: entitlement_id, updated_at: source_updated_at}
+      credit_redemption: {key: redemption_id, updated_at: source_updated_at}
+      certificate: {key: certificate_token, updated_at: source_updated_at}
+    privacy:
+      direct_identifiers_allowed: false
+      account_token_required: true
+  experimentation_platform:
+    domain: product
+    transport: object_export
+    cadence: every_15_minutes
+    classification: pseudonymous
+    objects:
+      assignment: {key: assignment_id, updated_at: source_updated_at}
+      exposure: {key: exposure_event_id, updated_at: source_updated_at}
 
 shared_controls:
   retryable_statuses: [408, 425, 429, 500, 502, 503, 504]
@@ -42,16 +53,14 @@ shared_controls:
   raw_payload_preservation: true
   source_updated_at_required: true
   stable_business_key_required: true
-  max_quarantine_ratio: 0.02
+  max_quarantine_ratio: 0.01
   source_to_target_reconciliation: true
   secrets_from_runtime_secret_store_only: true
+  direct_identifiers_in_analytics_forbidden: true
+  watermark_commit_last: true
+
+reconciliation:
+  default_controls: [source_row_count, distinct_business_key_count, stable_hash_total, watermark_continuity, updated_at_distribution]
 
 observability:
-  metrics:
-    - request_count
-    - request_latency_seconds
-    - retry_count
-    - extracted_rows
-    - source_lag_seconds
-    - quarantine_ratio
-    - reconciliation_difference
+  metrics: [request_count, request_latency_seconds, retry_count, rate_limit_wait_seconds, extracted_rows, source_lag_seconds, quarantine_ratio, reconciliation_difference, schema_version_distribution]
