@@ -12,50 +12,47 @@ endpoint:
   page_size: 1000
   timeout_seconds: 30
   retryable_statuses: [408, 425, 429, 500, 502, 503, 504]
+  honor_retry_after: true
+  max_attempts: 6
+  jitter: full
 
 watermark:
   field: source_updated_at
   lower_bound: committed
   upper_bound: capture_before_extract
   interval: closed_open
-  commit_after:
-    - raw_persisted
-    - clean_quality_passed
-    - canonical_merge_completed
-    - reconciliation_passed
-    - curated_publish_completed
+  lookback_minutes: 30
+  commit_after: [raw_persisted, clean_quality_passed, canonical_merge_completed, reconciliation_passed, curated_publish_completed]
 
 objects:
   product_event:
     key: event_id
     schema: contracts/product_event.v1.schema.json
-    fields:
-      - event_id
-      - event_type
-      - event_ts
-      - source_updated_at
-      - source_version
-      - business_key
-      - session_id
-      - tool_id
-      - content_id
-      - account_token
-      - user_token
-      - channel
-      - country_code
-      - language_code
-      - integration_id
-      - completion_id
-    dedupe:
-      key: event_id
-      precedence: [source_version_desc, source_updated_at_desc]
+    event_families:
+      session: [session_start, session_end]
+      discovery: [search, search_impression, search_click, recommendation_impression, recommendation_click]
+      clinical_tools: [tool_view, tool_start, tool_complete, result_copy, result_share, favorite_add, favorite_remove, quality_rating_view]
+      content: [content_view, guideline_view, decision_aid_view, creator_profile_view]
+      education: [cme_content_view, cme_credit_earned]
+      integration: [ehr_launch, ehr_autofill, ehr_input_confirmed, ehr_writeback, integration_launch]
+    dedupe: {key: event_id, precedence: [source_version_desc, source_updated_at_desc]}
+    privacy:
+      direct_identifiers_allowed: false
+      raw_search_text_allowed: false
+      raw_patient_context_allowed: false
+  account_profile:
+    key: account_token
+    fields: [account_token, organization_token, occupation_category, specialty, country_code, preferences_version, source_updated_at]
+    classification: pseudonymous
+  personalization_state:
+    key: account_token
+    fields: [account_token, favorite_tool_ids, recent_tool_ids, specialty_preferences, source_version, source_updated_at]
+    classification: pseudonymous
 
 observability:
-  metrics:
-    - request_latency_seconds
-    - pages_read
-    - records_read
-    - retry_count
-    - source_lag_seconds
-    - duplicate_event_ids
+  metrics: [request_latency_seconds, pages_read, records_read, retry_count, source_lag_seconds, duplicate_event_ids, schema_version_distribution, event_type_distribution, cursor_progress, rate_limit_wait_seconds]
   freshness_slo_minutes: 20
+  availability_slo: 0.999
+
+reconciliation:
+  controls: [page_manifest_count, distinct_event_ids, event_type_distribution, account_token_distinct_count, watermark_continuity]
