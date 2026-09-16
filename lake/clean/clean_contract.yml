@@ -1,0 +1,148 @@
+version: 1
+zone: clean
+purpose: contract_validated_normalized_records
+
+path_convention: >-
+  s3://clinical-data-{env}-clean/{domain}/{entity}/event_date={yyyy-mm-dd}/hour={hh}/part-{partition}.parquet
+
+storage:
+  format: parquet
+  compression: zstd
+  overwrite_policy: partition_replace_only_for_same_run
+  file_target_mb: 256
+
+required_metadata:
+  - event_id
+  - business_key
+  - source_system
+  - source_version
+  - source_updated_at
+  - normalized_at
+  - canonical_hash
+  - quality_status
+
+normalization:
+  strings:
+    trim: true
+    normalize_blank_to_null: true
+  country_code:
+    uppercase: true
+    pattern: '^[A-Z]{2}$'
+    unknown_value: ZZ
+  language_code:
+    lowercase: true
+  timestamps:
+    timezone: UTC
+    reject_naive: true
+  decimals:
+    scale: 2
+    rounding: half_even
+  identifiers:
+    preserve_source_case: false
+    stable_token_fields:
+      - account_token
+      - user_token
+  arrays:
+    sort_when_order_not_semantic: true
+    deduplicate_when_contract_marks_set: true
+
+entities:
+  product_event:
+    business_key: [event_id]
+    required:
+      - event_id
+      - event_type
+      - event_ts
+      - source_updated_at
+      - source_system
+      - source_version
+    event_type_values:
+      - session_start
+      - session_end
+      - search
+      - tool_view
+      - tool_start
+      - tool_complete
+      - favorite_add
+      - favorite_remove
+      - content_view
+      - integration_launch
+    conditional_rules:
+      tool_view:
+        required: [tool_id, session_id]
+      tool_start:
+        required: [tool_id, session_id]
+      tool_complete:
+        required: [tool_id, session_id, completion_id]
+      search:
+        required: [query_token, session_id]
+      content_view:
+        required: [content_id, session_id]
+      integration_launch:
+        required: [integration_id, tool_id]
+  clinical_tool:
+    business_key: [tool_id]
+    required:
+      - tool_id
+      - tool_slug
+      - tool_name
+      - primary_specialty
+      - publication_status
+      - source_version
+      - source_updated_at
+    publication_status_values: [draft, review, published, retired]
+  content:
+    business_key: [content_id]
+    required:
+      - content_id
+      - content_type
+      - publication_status
+      - source_version
+      - source_updated_at
+  account:
+    business_key: [account_token]
+    required:
+      - account_token
+      - source_updated_at
+
+quarantine:
+  path_convention: >-
+    s3://clinical-data-{env}-quarantine/{domain}/{entity}/reason={reason_code}/event_date={yyyy-mm-dd}/run_id={run_id}/
+  preserve_original_payload: true
+  preserve_validation_errors: true
+  fields:
+    - quarantine_id
+    - run_id
+    - event_id
+    - business_key
+    - reason_code
+    - reason_field
+    - reason_message
+    - source_system
+    - source_updated_at
+    - raw_payload
+    - quarantined_at
+  reason_codes:
+    - contract_validation_failed
+    - missing_business_key
+    - missing_required_field
+    - invalid_timestamp
+    - future_event_time
+    - unsupported_event_type
+    - invalid_country_code
+    - invalid_source_version
+    - incompatible_schema_version
+
+quality_gates:
+  max_quarantine_ratio: 0.02
+  critical_fields_max_null_ratio: 0.0
+  duplicate_event_id_ratio: 0.0
+  unknown_schema_version_ratio: 0.0
+  warning_country_unknown_ratio: 0.05
+
+lineage:
+  retain_raw_object_uri: true
+  retain_raw_record_identifier: true
+  retain_ingest_run_id: true
+  retain_schema_version: true
+  retain_transform_version: true
