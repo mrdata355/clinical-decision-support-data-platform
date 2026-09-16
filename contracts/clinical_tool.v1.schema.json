@@ -1,39 +1,81 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schemas.example.org/clinical-data/clinical-tool.v1.json",
-  "title": "Clinical Tool Metadata v1",
+  "title": "Clinical Tool Metadata V1",
+  "$comment": "Portfolio/reference contract informed only by public clinical-decision-support product concepts; not an MDCalc internal schema.",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "tool_id",
-    "tool_slug",
-    "tool_name",
-    "primary_specialty",
-    "publication_status",
-    "source_version",
-    "source_updated_at"
-  ],
+  "required": ["tool_id", "tool_slug", "tool_name", "tool_type", "primary_specialty", "publication_status", "source_version", "source_updated_at"],
   "properties": {
     "tool_id": {"type": "string", "minLength": 1, "maxLength": 128},
-    "tool_slug": {"type": "string", "minLength": 1, "maxLength": 256},
+    "tool_slug": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
     "tool_name": {"type": "string", "minLength": 1, "maxLength": 512},
+    "short_description": {"type": ["string", "null"], "maxLength": 1000},
+    "tool_type": {"type": "string", "enum": ["diagnosis", "rule_out", "prognosis", "formula", "treatment", "algorithm", "risk_assessment", "drug_dosing", "diagnostic_criteria", "decision_aid"]},
     "primary_specialty": {"type": "string", "minLength": 1, "maxLength": 128},
-    "condition_group": {"type": ["string", "null"], "maxLength": 256},
-    "evidence_status": {"type": ["string", "null"], "maxLength": 128},
+    "specialties": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "conditions": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "chief_complaints": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "organ_systems": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "condition_group": {"type": ["string", "null"], "maxLength": 128},
+    "evidence_status": {"type": ["string", "null"], "enum": [null, "emerging", "validated", "externally_validated", "guideline_supported", "legacy"]},
+    "quality_rating": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["overall", "scientific_soundness", "importance", "usability_feasibility"],
+      "properties": {
+        "overall": {"type": "number", "minimum": 0, "maximum": 10},
+        "scientific_soundness": {"type": "number", "minimum": 0, "maximum": 6},
+        "importance": {"type": "number", "minimum": 0, "maximum": 3},
+        "usability_feasibility": {"type": "number", "minimum": 0, "maximum": 1},
+        "fairness_equity_status": {"type": ["string", "null"]},
+        "rating_version": {"type": ["string", "null"]}
+      }
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["input_id", "label", "data_type", "required"],
+        "properties": {
+          "input_id": {"type": "string", "minLength": 1},
+          "label": {"type": "string", "minLength": 1},
+          "data_type": {"type": "string", "enum": ["boolean", "integer", "decimal", "choice", "date", "duration", "text"]},
+          "required": {"type": "boolean"},
+          "unit_family": {"type": ["string", "null"]},
+          "allowed_units": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+          "min_value": {"type": ["number", "null"]},
+          "max_value": {"type": ["number", "null"]},
+          "choices": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+          "ehr_autofill_eligible": {"type": "boolean", "default": false}
+        }
+      }
+    },
+    "result_contract": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "result_type": {"type": "string", "enum": ["score", "risk", "category", "dose", "value", "recommendation_band", "multi_output"]},
+        "unit": {"type": ["string", "null"]},
+        "interpretation_required": {"type": "boolean", "default": true},
+        "copyable": {"type": "boolean", "default": true},
+        "ehr_writeback_eligible": {"type": "boolean", "default": false}
+      }
+    },
+    "critical_actions": {"type": "array", "items": {"type": "string", "maxLength": 2000}},
+    "limitations": {"type": "array", "items": {"type": "string", "maxLength": 2000}},
+    "creator_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "contributor_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "evidence_reference_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "guideline_reference_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "cme_eligible": {"type": "boolean", "default": false},
+    "ehr_enabled": {"type": "boolean", "default": false},
+    "suggested_calc_eligible": {"type": "boolean", "default": false},
     "publication_status": {"type": "string", "enum": ["draft", "review", "published", "retired"]},
     "first_published_at": {"type": ["string", "null"], "format": "date-time"},
     "last_reviewed_at": {"type": ["string", "null"], "format": "date-time"},
     "source_version": {"type": "integer", "minimum": 1},
-    "source_updated_at": {"type": "string", "format": "date-time"},
-    "specialties": {
-      "type": "array",
-      "items": {"type": "string", "minLength": 1},
-      "uniqueItems": true
-    },
-    "condition_tags": {
-      "type": "array",
-      "items": {"type": "string", "minLength": 1},
-      "uniqueItems": true
-    }
+    "source_updated_at": {"type": "string", "format": "date-time"}
   }
 }
