@@ -1,0 +1,48 @@
+source: mobile_events
+domain: product
+transport: object_export
+owner: product-engineering
+cadence: every_15_minutes
+classification: pseudonymous
+
+objects:
+  mobile_event:
+    key: event_id
+    partition_by: [event_date, platform]
+    platforms: [ios, android]
+    required_fields:
+      - event_id
+      - event_type
+      - event_ts
+      - session_id
+      - app_version
+      - platform
+      - source_updated_at
+    optional_fields:
+      - tool_id
+      - content_id
+      - account_token
+      - user_token
+      - country_code
+      - language_code
+      - integration_id
+
+watermark:
+  field: source_updated_at
+  interval: closed_open
+  late_arrival_lookback_hours: 48
+  commit_after_reconciliation: true
+
+quality:
+  max_missing_event_id_ratio: 0
+  max_missing_event_ts_ratio: 0
+  max_unknown_platform_ratio: 0
+  max_future_event_ratio: 0
+  accepted_platforms: [ios, android]
+
+observability:
+  freshness_slo_minutes: 30
+  volume_baseline_days: 28
+  alert_on_schema_drift: true
+  alert_on_volume_ratio_below: 0.4
+  alert_on_volume_ratio_above: 2.5
