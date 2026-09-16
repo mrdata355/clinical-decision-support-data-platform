@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Clinical Data Platform | Real-Time Stream</title>
+<style>
+:root{--bg:#07111f;--panel:#0d1b2a;--panel2:#10243a;--line:#27445f;--text:#eaf2fb;--muted:#8ea9c4;--good:#37d67a;--warn:#ffbe55;--bad:#ff6b6b;--accent:#5aa9ff;--purple:#8d7cff;--cyan:#58d4d0}*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#06101c,#091827);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.shell{max-width:1600px;margin:auto;padding:22px}.top{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}.top h1{margin:0;font-size:28px}.top p{margin:6px 0 0;color:var(--muted);max-width:860px;line-height:1.45}.actions{display:flex;gap:8px;flex-wrap:wrap}.btn{border:1px solid var(--line);background:#10243a;color:var(--text);border-radius:9px;padding:10px 14px;cursor:pointer}.btn.primary{background:linear-gradient(135deg,#287bd2,#6558d8);border-color:transparent}.btn.stop{background:#3b1d24;border-color:#71323e}.btn:hover{filter:brightness(1.12)}.grid{display:grid;gap:13px}.metrics{grid-template-columns:repeat(8,minmax(105px,1fr));margin-top:18px}.card{background:linear-gradient(180deg,#0e1f31,#0b1928);border:1px solid var(--line);border-radius:14px;padding:15px}.metric label{display:block;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.06em}.metric strong{display:block;font-size:24px;margin-top:6px}.metric small{color:var(--muted)}.good{color:var(--good)}.warn{color:var(--warn)}.bad{color:var(--bad)}.section{margin-top:13px}.title{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:10px}.title h2{margin:0;font-size:15px}.badge{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:4px 8px}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--good);margin-right:6px}.two{grid-template-columns:1.25fr .75fr}.pipeline{display:grid;grid-template-columns:repeat(5,1fr);gap:9px}.stage{position:relative;border:1px solid var(--line);background:#0a1725;border-radius:11px;padding:12px}.stage:after{content:'→';position:absolute;right:-16px;top:38px;color:#5a7897;font-size:19px}.stage:last-child:after{display:none}.stage b{font-size:12px}.stage .n{font-size:23px;font-weight:800;margin:7px 0 3px}.stage small{color:var(--muted)}.chartWrap{height:245px;border:1px solid #1d354d;border-radius:10px;padding:10px;background:#081624}.chart{width:100%;height:100%}.axis{stroke:#36506a;stroke-width:1}.series1{fill:none;stroke:var(--accent);stroke-width:3}.series2{fill:none;stroke:var(--purple);stroke-width:3}.series3{fill:none;stroke:var(--cyan);stroke-width:2}.legend{display:flex;gap:14px;color:var(--muted);font-size:11px;flex-wrap:wrap}.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px}.health{display:grid;gap:9px}.healthrow{display:grid;grid-template-columns:140px 1fr 70px;gap:9px;align-items:center;font-size:12px}.track{height:8px;background:#12283c;border-radius:999px;overflow:hidden}.fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--purple));border-radius:999px}.tablewrap{overflow:auto;max-height:430px}table{width:100%;border-collapse:collapse;font-size:12px}th{position:sticky;top:0;background:#0e1f31;color:var(--muted);text-align:left;padding:9px;border-bottom:1px solid var(--line)}td{padding:8px 9px;border-bottom:1px solid #172d43;white-space:nowrap}.pill{display:inline-block;border-radius:999px;padding:3px 7px;font-size:10px;font-weight:700}.inserted,.approved{background:rgba(55,214,122,.13);color:#9bf1bd}.updated{background:rgba(90,169,255,.14);color:#9dccff}.duplicate,.stale{background:rgba(255,190,85,.13);color:#ffd28a}.declined,.quarantined{background:rgba(255,107,107,.13);color:#ff9b9b}.notice{border-left:3px solid var(--accent);padding:10px 12px;background:#0b1a2a;color:#b9cee2;border-radius:0 8px 8px 0;font-size:12px;line-height:1.5}.muted{color:var(--muted)}.pulse{animation:pulse .4s ease}@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(90,169,255,.7)}100%{box-shadow:0 0 0 13px rgba(90,169,255,0)}}@media(max-width:1150px){.metrics{grid-template-columns:repeat(4,1fr)}.two{grid-template-columns:1fr}.pipeline{grid-template-columns:1fr 1fr}.stage:after{display:none}}@media(max-width:700px){.shell{padding:13px}.top{flex-direction:column}.metrics{grid-template-columns:1fr 1fr}.pipeline{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="top">
+    <div><h1>Real-Time Streaming Evidence</h1><p>Generated customer/account checks, clinical-product interactions, and payment events arrive every fraction of a second. The dashboard shows event-time ingestion, validation, merge outcomes, current state, throughput, lag, freshness, and reconciliation immediately.</p></div>
+    <div class="actions"><button class="btn primary" id="startBtn">Start live stream</button><button class="btn stop" id="stopBtn">Stop</button><button class="btn" id="burstBtn">Inject burst</button><button class="btn" id="duplicateBtn">Replay duplicate</button><button class="btn" id="resetBtn">Reset</button></div>
+  </div>
+
+  <div class="grid metrics">
+    <div class="card metric"><label>Events</label><strong id="eventMetric">0</strong><small>received</small></div>
+    <div class="card metric"><label>EPS</label><strong id="epsMetric">0.0</strong><small>events/sec</small></div>
+    <div class="card metric"><label>p95 lag</label><strong id="lagMetric">0 ms</strong><small>event → curated</small></div>
+    <div class="card metric"><label>Freshness</label><strong id="freshMetric">0.0s</strong><small>latest curated</small></div>
+    <div class="card metric"><label>Inserted</label><strong class="good" id="insertMetric">0</strong><small>new state</small></div>
+    <div class="card metric"><label>Updated</label><strong id="updateMetric">0</strong><small>higher version</small></div>
+    <div class="card metric"><label>Duplicates</label><strong class="warn" id="duplicateMetric">0</strong><small>replayed</small></div>
+    <div class="card metric"><label>Reconcile</label><strong class="good" id="reconMetric">PASS</strong><small id="reconSub">0 = 0</small></div>
+  </div>
+
+  <div class="card section">
+    <div class="title"><h2>Continuous event path</h2><span class="badge" id="statusBadge"><span class="dot"></span>ready</span></div>
+    <div class="pipeline">
+      <div class="stage" id="rawStage"><b>RAW</b><div class="n" id="rawCount">0</div><small>append-only event envelope</small></div>
+      <div class="stage" id="cleanStage"><b>CLEAN</b><div class="n" id="cleanCount">0</div><small>contract + type validation</small></div>
+      <div class="stage" id="mergeStage"><b>MERGE</b><div class="n" id="mergeCount">0</div><small>event ID + source version</small></div>
+      <div class="stage" id="coreStage"><b>CORE</b><div class="n" id="coreCount">0</div><small>canonical current state</small></div>
+      <div class="stage" id="curatedStage"><b>CURATED</b><div class="n" id="curatedCount">0</div><small>streaming operations mart</small></div>
+    </div>
+  </div>
+
+  <div class="grid two section">
+    <div class="card"><div class="title"><h2>Last 30 seconds</h2><div class="legend"><span><i style="background:var(--accent)"></i>events/sec</span><span><i style="background:var(--purple)"></i>accepted/sec</span><span><i style="background:var(--cyan)"></i>lag ms ÷ 20</span></div></div><div class="chartWrap"><svg id="chart" class="chart" viewBox="0 0 900 220" role="img" aria-label="real-time streaming throughput"></svg></div></div>
+    <div class="card"><div class="title"><h2>Stream health</h2><span class="badge">continuous query view</span></div><div class="health" id="health"></div><div class="notice" style="margin-top:13px">This page is intentionally generated-data only. In connected mode the same metrics can be populated from warehouse/query-history, Airflow, or event-platform telemetry without changing the presentation contract.</div></div>
+  </div>
+
+  <div class="grid two section">
+    <div class="card"><div class="title"><h2>Current account state</h2><span class="badge">highest accepted source version</span></div><div class="tablewrap"><table><thead><tr><th>Account</th><th>Checks</th><th>Last payment</th><th>Status</th><th>Version</th><th>Updated</th></tr></thead><tbody id="accountRows"></tbody></table></div></div>
+    <div class="card"><div class="title"><h2>Live event evidence</h2><span class="badge">latest 80 events</span></div><div class="tablewrap"><table><thead><tr><th>Time</th><th>Event</th><th>Type</th><th>Key</th><th>v</th><th>Outcome</th><th>Lag</th></tr></thead><tbody id="eventRows"></tbody></table></div></div>
+  </div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const state={running:false,timer:null,seq:1,started:0,events:[],ids:new Set(),accounts:new Map(),counts:{raw:0,clean:0,merge:0,curated:0,inserted:0,updated:0,duplicate:0,quarantine:0},seconds:Array.from({length:30},()=>({events:0,accepted:0,lag:0})),secondStarted:Date.now(),secondEvents:0,lastCurated:0,lags:[]};
+const accounts=['acct_1001','acct_1002','acct_1003','acct_1004','acct_1005','acct_1006','acct_1007','acct_1008'];
+const types=['CUSTOMER_CHECK','PAYMENT_APPROVED','PAYMENT_APPROVED','PAYMENT_APPROVED','PAYMENT_DECLINED','TOOL_INTERACTION'];
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const rand=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+const now=()=>new Date();
+const clock=d=>d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+function seed(){accounts.forEach((id,i)=>state.accounts.set(id,{id,checks:rand(0,3),lastPayment:'—',status:i%7===0?'review':'active',version:1,updated:clock(now())}));}
+function nextId(){return 'evt_'+String(state.seq++).padStart(6,'0')}
+function makeEvent(forceDuplicate=false){
+  if(forceDuplicate&&state.events.length){const prior=state.events[rand(0,Math.min(15,state.events.length-1))];return {...prior,arrivalAt:Date.now(),eventAt:Date.now()-rand(30,500)};}
+  const account=pick(accounts), type=pick(types), entity=state.accounts.get(account), version=Math.random()<.20?entity.version+1:entity.version;
+  return {eventId:nextId(),type,key:account,version,eventAt:Date.now()-rand(20,650),arrivalAt:Date.now(),amount:type.startsWith('PAYMENT')?rand(20,850)+.99:null};
+}
+function process(event){
+  state.counts.raw++; state.secondEvents++;
+  let outcome='UNCHANGED';
+  if(state.ids.has(event.eventId)){outcome='DUPLICATE';state.counts.duplicate++;}
+  else{
+    state.ids.add(event.eventId); state.counts.clean++; state.counts.merge++;
+    const a=state.accounts.get(event.key);
+    if(!a){outcome='QUARANTINED';state.counts.quarantine++;}
+    else if(event.version>a.version){outcome='UPDATED';state.counts.updated++;a.version=event.version;}
+    else if(event.version<a.version){outcome='STALE';}
+    else if(!a.seen){outcome='INSERTED';state.counts.inserted++;a.seen=true;}
+    else outcome='UNCHANGED';
+    if(outcome!=='QUARANTINED'&&outcome!=='STALE'){
+      if(event.type==='CUSTOMER_CHECK') a.checks++;
+      if(event.type.startsWith('PAYMENT')){a.lastPayment=event.amount?('$'+event.amount.toFixed(2)):'—';a.status=event.type==='PAYMENT_DECLINED'?'payment_review':'active';}
+      a.updated=clock(now()); state.counts.curated++; state.lastCurated=Date.now();
+    }
+  }
+  const lag=Math.max(1,Date.now()-event.eventAt+rand(5,45)); state.lags.push(lag); if(state.lags.length>300)state.lags.shift();
+  state.events.unshift({...event,outcome,lag,processedAt:Date.now()}); if(state.events.length>100)state.events.pop();
+  render();
+}
+function tick(){process(makeEvent(false)); if(Math.random()<.18)process(makeEvent(false)); if(Math.random()<.035)process(makeEvent(true));}
+function start(){if(state.running)return;state.running=true;state.started=Date.now();$('statusBadge').innerHTML='<span class="dot"></span>streaming';state.timer=setInterval(tick,280);}
+function stop(){state.running=false;if(state.timer)clearInterval(state.timer);state.timer=null;$('statusBadge').textContent='stopped';}
+function burst(){for(let i=0;i<20;i++)setTimeout(()=>process(makeEvent(false)),i*25);}
+function reset(){stop();state.seq=1;state.events=[];state.ids.clear();state.accounts.clear();state.counts={raw:0,clean:0,merge:0,curated:0,inserted:0,updated:0,duplicate:0,quarantine:0};state.seconds=Array.from({length:30},()=>({events:0,accepted:0,lag:0}));state.secondStarted=Date.now();state.secondEvents=0;state.lastCurated=0;state.lags=[];seed();render();$('statusBadge').innerHTML='<span class="dot"></span>ready';}
+function rollSecond(){const accepted=state.events.filter(e=>Date.now()-e.processedAt<1000&&!['DUPLICATE','STALE','QUARANTINED'].includes(e.outcome)).length;const recent=state.lags.slice(-Math.max(1,state.secondEvents));const lag=recent.length?recent.reduce((a,b)=>a+b,0)/recent.length:0;state.seconds.push({events:state.secondEvents,accepted,lag});state.seconds.shift();state.secondEvents=0;render();}
+function percentile(arr,p){if(!arr.length)return 0;const s=[...arr].sort((a,b)=>a-b);return s[Math.min(s.length-1,Math.floor((s.length-1)*p))];}
+function pulse(id){const el=$(id);el.classList.remove('pulse');void el.offsetWidth;el.classList.add('pulse');}
+function renderChart(){const svg=$('chart'),data=state.seconds,max=Math.max(4,...data.map(d=>Math.max(d.events,d.accepted,d.lag/20)));const pts=(key,scale=1)=>data.map((d,i)=>`${20+i*(860/29)},${195-(Math.min(max,d[key]/scale)/max)*165}`).join(' ');svg.innerHTML=`<line class="axis" x1="20" y1="195" x2="880" y2="195"/><line class="axis" x1="20" y1="25" x2="20" y2="195"/><polyline class="series1" points="${pts('events')}"/><polyline class="series2" points="${pts('accepted')}"/><polyline class="series3" points="${pts('lag',20)}"/><text x="24" y="18" fill="#8ea9c4" font-size="11">live rolling 30-second window</text>`;}
+function render(){
+  $('eventMetric').textContent=state.counts.raw;$('epsMetric').textContent=(state.seconds.slice(-5).reduce((a,b)=>a+b.events,0)/5).toFixed(1);$('lagMetric').textContent=Math.round(percentile(state.lags,.95))+' ms';$('freshMetric').textContent=state.lastCurated?((Date.now()-state.lastCurated)/1000).toFixed(1)+'s':'0.0s';$('insertMetric').textContent=state.counts.inserted;$('updateMetric').textContent=state.counts.updated;$('duplicateMetric').textContent=state.counts.duplicate;
+  const explained=state.counts.clean+state.counts.duplicate+state.counts.quarantine;const balanced=state.counts.raw===explained;$('reconMetric').textContent=balanced?'PASS':'CHECK';$('reconMetric').className=balanced?'good':'bad';$('reconSub').textContent=`${state.counts.raw} = ${explained}`;
+  $('rawCount').textContent=state.counts.raw;$('cleanCount').textContent=state.counts.clean;$('mergeCount').textContent=state.counts.merge;$('coreCount').textContent=state.accounts.size;$('curatedCount').textContent=state.counts.curated;
+  $('accountRows').innerHTML=[...state.accounts.values()].map(a=>`<tr><td>${a.id}</td><td>${a.checks}</td><td>${a.lastPayment}</td><td>${a.status}</td><td>${a.version}</td><td>${a.updated}</td></tr>`).join('');
+  $('eventRows').innerHTML=state.events.slice(0,80).map(e=>`<tr><td>${clock(new Date(e.processedAt))}</td><td>${e.eventId}</td><td>${e.type}</td><td>${e.key}</td><td>${e.version}</td><td><span class="pill ${e.outcome.toLowerCase()}">${e.outcome}</span></td><td>${e.lag} ms</td></tr>`).join('');
+  const eps=Number($('epsMetric').textContent),p95=percentile(state.lags,.95),fresh=state.lastCurated?(Date.now()-state.lastCurated)/1000:0;
+  const rows=[['Input rate',Math.min(100,eps*12),eps.toFixed(1)+' eps'],['Processing headroom',Math.max(10,100-eps*5),Math.round(Math.max(10,100-eps*5))+'%'],['p95 latency',Math.max(8,100-Math.min(90,p95/10)),Math.round(p95)+' ms'],['Freshness',Math.max(8,100-Math.min(90,fresh*20)),fresh.toFixed(1)+' s'],['Reconciliation',balanced?100:20,balanced?'PASS':'CHECK']];
+  $('health').innerHTML=rows.map(r=>`<div class="healthrow"><span>${r[0]}</span><div class="track"><div class="fill" style="width:${r[1]}%"></div></div><b>${r[2]}</b></div>`).join('');renderChart();pulse('curatedStage');
+}
+$('startBtn').addEventListener('click',start);$('stopBtn').addEventListener('click',stop);$('burstBtn').addEventListener('click',burst);$('duplicateBtn').addEventListener('click',()=>process(makeEvent(true)));$('resetBtn').addEventListener('click',reset);setInterval(rollSecond,1000);seed();render();
+</script>
+</body>
+</html>
