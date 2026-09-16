@@ -1,0 +1,51 @@
+source: web_events
+domain: product
+transport: object_export
+owner: web-platform
+cadence: every_15_minutes
+classification: pseudonymous
+
+objects:
+  web_event:
+    key: event_id
+    partition_by: [event_date, browser_family]
+    required_fields:
+      - event_id
+      - event_type
+      - event_ts
+      - session_id
+      - source_updated_at
+      - page_category
+    optional_fields:
+      - tool_id
+      - content_id
+      - account_token
+      - user_token
+      - country_code
+      - language_code
+      - referrer_category
+      - experiment_assignments
+
+watermark:
+  field: source_updated_at
+  interval: closed_open
+  late_arrival_lookback_hours: 48
+  commit_after_reconciliation: true
+
+privacy:
+  store_raw_url: false
+  store_raw_search_text: false
+  search_field: query_token
+  direct_identifiers_allowed: false
+
+quality:
+  max_missing_event_id_ratio: 0
+  max_missing_event_ts_ratio: 0
+  max_missing_session_id_ratio: 0.001
+  max_future_event_ratio: 0
+
+observability:
+  freshness_slo_minutes: 30
+  volume_baseline_days: 28
+  monitor_browser_distribution: true
+  monitor_event_type_distribution: true
