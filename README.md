@@ -28,7 +28,8 @@ Application APIs / web / mobile / content / integrations / SaaS
 
 `DEMO_MODE=true` requires no external credentials. The repository can generate synthetic records and the static browser consoles run without a backend.
 
-- `site/index.html` — source-to-serving merge and pipeline operations console.
+- `site/index.html` — interview operations portal. It opens the real-time stream by default and switches directly to the compressed 10-minute customer/payment view.
+- `site/realtime_stream.html` — generated events every ~280 ms with EPS, p95 event-to-curated lag, freshness, RAW/CLEAN/MERGE/CORE/CURATED movement, canonical account state, duplicate replay, burst injection, reconciliation, and a rolling 30-second chart.
 - `site/customer_payment_stream.html` — customer/account checks, payment events, RAW/CLEAN/MERGE/CORE/CURATED state, and a compressed rolling 10-minute stream demonstration.
 
 ### Connected mode
