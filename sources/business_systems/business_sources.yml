@@ -7,13 +7,11 @@ sources:
       account:
         key: account_token
         updated_at: source_updated_at
-        fields:
-          - account_token
-          - account_type
-          - organization_token
-          - country_code
-          - created_at
-          - source_updated_at
+        fields: [account_token, account_type, organization_token, occupation_category, specialty, country_code, created_at, last_active_at, source_version, source_updated_at]
+      organization:
+        key: organization_token
+        updated_at: source_updated_at
+        fields: [organization_token, organization_type, country_code, site_count, contract_tier, source_version, source_updated_at]
   finance_ledger:
     domain: finance
     cadence: daily
@@ -22,13 +20,11 @@ sources:
       revenue_daily:
         key: revenue_record_id
         updated_at: source_updated_at
-        fields:
-          - revenue_record_id
-          - business_date
-          - revenue_category
-          - amount
-          - currency_code
-          - source_updated_at
+        fields: [revenue_record_id, business_date, revenue_category, product_line, amount, currency_code, source_updated_at]
+      subscription_mrr:
+        key: subscription_snapshot_id
+        updated_at: source_updated_at
+        fields: [subscription_snapshot_id, business_date, product_line, organization_token, mrr_amount, currency_code, source_updated_at]
   marketing_platform:
     domain: growth
     cadence: hourly
@@ -37,33 +33,39 @@ sources:
       campaign_activity:
         key: campaign_event_id
         updated_at: source_updated_at
-        fields:
-          - campaign_event_id
-          - campaign_id
-          - channel
-          - activity_type
-          - activity_ts
-          - source_updated_at
+        fields: [campaign_event_id, campaign_id, channel, activity_type, activity_ts, source_updated_at]
+  editorial_workflow:
+    domain: clinical_content
+    cadence: hourly
+    classification: internal
+    objects:
+      review_work_item:
+        key: work_item_id
+        updated_at: source_updated_at
+        fields: [work_item_id, entity_type, entity_id, workflow_state, reviewer_role, due_at, completed_at, source_updated_at]
+  enterprise_implementation:
+    domain: integrations
+    cadence: hourly
+    classification: internal
+    objects:
+      implementation_project:
+        key: implementation_id
+        updated_at: source_updated_at
+        fields: [implementation_id, organization_token, integration_id, environment, phase, go_live_target, status, source_updated_at]
 
 controls:
-  extraction:
-    capture_upper_watermark_first: true
-    interval: closed_open
-    preserve_raw: true
-  merge:
-    version_aware: true
-    late_arrival_supported: true
-    duplicate_protection: true
-  publication:
-    quality_gate_required: true
-    reconciliation_gate_required: true
-    watermark_commit_last: true
+  extraction: {capture_upper_watermark_first: true, interval: closed_open, preserve_raw: true, retry_safe: true}
+  merge: {version_aware: true, late_arrival_supported: true, duplicate_protection: true}
+  publication: {quality_gate_required: true, reconciliation_gate_required: true, watermark_commit_last: true}
+  privacy: {direct_identifiers_in_analytics_forbidden: true, organization_and_account_tokens_required: true}
+
+reconciliation:
+  controls: [source_target_row_count, distinct_business_keys, financial_amount_sum, organization_reference_integrity, source_version_monotonicity, watermark_continuity]
 
 observability:
-  freshness_slo_minutes:
-    identity_directory: 180
-    finance_ledger: 1560
-    marketing_platform: 180
+  freshness_slo_minutes: {identity_directory: 180, finance_ledger: 1560, marketing_platform: 180, editorial_workflow: 180, enterprise_implementation: 180}
   monitor_row_count_baseline: true
   monitor_schema_drift: true
   monitor_null_profile: true
+  monitor_financial_sum_variance: true
+  monitor_reference_integrity: true
