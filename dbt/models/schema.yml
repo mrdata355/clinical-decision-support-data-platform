@@ -1,0 +1,162 @@
+version: 2
+
+sources:
+  - name: raw
+    database: CLINICAL_ANALYTICS
+    schema: RAW
+    loaded_at_field: ingested_at
+    freshness:
+      warn_after: {count: 20, period: minute}
+      error_after: {count: 45, period: minute}
+    tables:
+      - name: product_event
+        identifier: PRODUCT_EVENT
+        description: Immutable product and integration events.
+        columns:
+          - name: RAW_ID
+            tests: [not_null, unique]
+          - name: EVENT_ID
+          - name: EVENT_TYPE
+          - name: EVENT_TS
+          - name: SOURCE_UPDATED_AT
+          - name: INGESTED_AT
+            tests: [not_null]
+          - name: PAYLOAD
+            tests: [not_null]
+      - name: clinical_tool_snapshot
+        identifier: CLINICAL_TOOL_SNAPSHOT
+        description: Versioned clinical tool metadata snapshots.
+        freshness:
+          warn_after: {count: 25, period: hour}
+          error_after: {count: 36, period: hour}
+      - name: content_snapshot
+        identifier: CONTENT_SNAPSHOT
+        description: Versioned editorial and guideline content snapshots.
+        freshness:
+          warn_after: {count: 25, period: hour}
+          error_after: {count: 36, period: hour}
+
+models:
+  - name: stg_product_events
+    description: One normalized row per highest observed event version.
+    config:
+      contract:
+        enforced: false
+    columns:
+      - name: event_id
+        description: Stable event identifier used for idempotency.
+        tests: [not_null, unique]
+      - name: event_type
+        tests:
+          - not_null
+          - accepted_values:
+              values:
+                - session_start
+                - session_end
+                - search
+                - tool_view
+                - tool_start
+                - tool_complete
+                - favorite_add
+                - favorite_remove
+                - content_view
+                - integration_launch
+      - name: business_key
+        tests: [not_null]
+      - name: source_version
+        tests: [not_null]
+      - name: canonical_hash
+        tests: [not_null]
+      - name: event_ts
+        tests: [not_null]
+      - name: source_updated_at
+        tests: [not_null]
+
+  - name: dim_clinical_tool
+    description: Current clinical tool catalog representation.
+    columns:
+      - name: clinical_tool_key
+        tests: [not_null, unique]
+      - name: tool_id
+        tests: [not_null]
+      - name: tool_name
+        tests: [not_null]
+      - name: primary_specialty
+        tests: [not_null]
+      - name: is_current
+        tests: [not_null]
+
+  - name: dim_content
+    description: Content catalog for guideline and editorial analytics.
+    columns:
+      - name: content_key
+        tests: [not_null, unique]
+      - name: content_id
+        tests: [not_null]
+      - name: content_type
+        tests: [not_null]
+      - name: is_current
+        tests: [not_null]
+
+  - name: dim_account
+    description: De-identified account dimension derived from product activity.
+    columns:
+      - name: account_key
+        tests: [not_null, unique]
+      - name: account_token
+        tests: [not_null, unique]
+
+  - name: fct_product_event
+    description: Canonical event fact with resolved dimensional keys.
+    columns:
+      - name: event_id
+        tests: [not_null, unique]
+      - name: event_date
+        tests: [not_null]
+      - name: event_type
+        tests: [not_null]
+      - name: business_key
+        tests: [not_null]
+      - name: source_version
+        tests: [not_null]
+      - name: clinical_tool_key
+        tests:
+          - relationships:
+              to: ref('dim_clinical_tool')
+              field: clinical_tool_key
+              config:
+                severity: warn
+      - name: content_key
+        tests:
+          - relationships:
+              to: ref('dim_content')
+              field: content_key
+              config:
+                severity: warn
+      - name: account_key
+        tests:
+          - relationships:
+              to: ref('dim_account')
+              field: account_key
+              config:
+                severity: warn
+
+  - name: fct_tool_engagement_daily
+    description: Daily product engagement and conversion metrics by tool, channel, and geography.
+    columns:
+      - name: event_date
+        tests: [not_null]
+      - name: clinical_tool_key
+        tests: [not_null]
+      - name: tool_id
+        tests: [not_null]
+      - name: primary_specialty
+        tests: [not_null]
+      - name: channel
+        tests: [not_null]
+      - name: tool_views
+        tests: [not_null]
+      - name: tool_starts
+        tests: [not_null]
+      - name: tool_completions
+        tests: [not_null]
