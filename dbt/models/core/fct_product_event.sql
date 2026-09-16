@@ -18,11 +18,7 @@ with events as (
     {% endif %}
 ),
 tools as (
-    select
-        tool_id,
-        clinical_tool_key,
-        primary_specialty,
-        condition_group
+    select tool_id, clinical_tool_key, primary_specialty, condition_group, tool_type
     from {{ ref('dim_clinical_tool') }}
     where is_current
 ),
@@ -43,16 +39,34 @@ resolved as (
         to_date(e.event_ts) as event_date,
         e.business_key,
         e.session_id,
+        e.tool_id,
         t.clinical_tool_key,
+        t.primary_specialty,
+        t.condition_group,
+        t.tool_type,
+        e.content_id,
         c.content_key,
+        e.quality_rating_id,
+        e.account_token,
         a.account_key,
         e.user_token,
+        e.organization_token,
         e.channel,
         e.country_code,
         e.language_code,
         e.integration_id,
         e.search_query_token,
+        e.search_result_rank,
         e.completion_id,
+        e.result_band,
+        e.input_count,
+        e.autofill_field_count,
+        e.autofill_confirmed_count,
+        e.confidence_band,
+        e.recommendation_model,
+        e.recommendation_position,
+        e.cme_credit_hours,
+        e.experiment_assignments,
         e.source_system,
         e.source_version,
         e.source_updated_at,
