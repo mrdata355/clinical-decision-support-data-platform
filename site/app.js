@@ -20,7 +20,7 @@
     el.style.borderColor = isError ? 'rgba(255,107,122,.5)' : 'rgba(87,230,255,.35)';
     el.classList.add('show');
     clearTimeout(state.toastTimer);
-    state.toastTimer = setTimeout(() => el.classList.remove('show'), 2300);
+    state.toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
   }
 
   async function api(path, options = {}) {
@@ -167,12 +167,31 @@
 
   function renderAccounts(accounts) {
     $('accountRows').innerHTML = accounts.map((account) => `
-      <tr><td>${account.accountId}</td><td>${account.checks}</td><td>${account.interactions}</td><td>${statusPill(account.status === 'active' ? 'updated' : account.status)}</td><td>${account.sourceVersion}</td></tr>`).join('');
+      <tr>
+        <td><button class="text-btn customer-action" data-account="${account.accountId}" title="Run a live customer check">${account.accountId}</button></td>
+        <td>${account.checks}</td><td>${account.interactions}</td>
+        <td>${statusPill(account.status === 'active' ? 'updated' : account.status)}</td><td>${account.sourceVersion}</td>
+      </tr>`).join('');
+    $$('.customer-action').forEach((button) => button.addEventListener('click', () => runCustomerAction(button.dataset.account)));
   }
 
   function renderOutcomes(outcomes) {
     const order = ['inserted', 'updated', 'unchanged', 'duplicate', 'stale', 'quarantined', 'retries'];
     $('outcomeGrid').innerHTML = order.map((key) => `<div class="outcome-card"><span>${key}</span><strong>${formatNumber(outcomes[key])}</strong></div>`).join('');
+  }
+
+  async function runCustomerAction(accountId) {
+    try {
+      toast(`Running customer check for ${accountId}…`);
+      const { body } = await api('/api/customer-action', {
+        method: 'POST',
+        body: JSON.stringify({ accountId, action: 'customer_check' }),
+      });
+      renderTelemetry(body);
+      toast(`${accountId} updated · ${body.processedEvent?.outcome || 'processed'} · trace ${short(body.processedEvent?.traceId, 10)}`);
+    } catch (error) {
+      toast(`Customer action failed: ${error.message}`, true);
+    }
   }
 
   async function poll() {
@@ -190,10 +209,7 @@
   async function control(action, payload = {}) {
     try {
       toast(`Executing ${action}…`);
-      const { body } = await api('/api/control', {
-        method: 'POST',
-        body: JSON.stringify({ action, payload }),
-      });
+      const { body } = await api('/api/control', { method: 'POST', body: JSON.stringify({ action, payload }) });
       renderTelemetry(body);
       toast(`${action.toUpperCase()} acknowledged · ${short(body.requestId, 12)}`);
       if (action === 'inject_fault' || action === 'recover') await checkHealth();
@@ -232,6 +248,37 @@
     }
   }
 
+  function injectSqlCopilot() {
+    const controlsPanel = document.querySelector('[data-panel="controls"]');
+    if (!controlsPanel || $('sqlCopilotCard')) return;
+    const article = document.createElement('article');
+    article.id = 'sqlCopilotCard';
+    article.className = 'panel full-panel';
+    article.style.marginTop = '14px';
+    article.innerHTML = `
+      <div class="panel-head"><div><span class="kicker">GOVERNED RAG / SQL COPILOT</span><h2>Generate a report query</h2></div><span class="mono-tag">SELECT-ONLY</span></div>
+      <div class="engineering-note"><b>Policy:</b> MART / MART_DBT / OPS only, no RAW/STAGING access, explicit columns, max 500 rows. The public deployment plans SQL but does not execute against a warehouse without approved credentials.</div>
+      <div style="display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:14px">
+        <input id="sqlQuestion" class="btn" style="text-align:left;width:100%;cursor:text" value="Show tool completions by specialty for the last 7 days" aria-label="Analytics question" />
+        <button id="sqlAskBtn" class="primary-btn" type="button">Generate SQL</button>
+      </div>
+      <pre id="sqlAnswer" style="white-space:pre-wrap;overflow:auto;margin:14px 0 0;padding:14px;border:1px solid var(--line);border-radius:12px;background:#06111e;color:#b9cee2;min-height:120px">Ask for tool funnel, search discovery, EHR integration, pipeline health, quality, or recommendation-model reporting.</pre>`;
+    controlsPanel.appendChild(article);
+    $('sqlAskBtn').addEventListener('click', async () => {
+      const question = $('sqlQuestion').value.trim();
+      if (!question) return;
+      $('sqlAnswer').textContent = 'Planning governed SQL…';
+      try {
+        const { body } = await api('/api/sql-bot', { method: 'POST', body: JSON.stringify({ question }) });
+        $('sqlAnswer').textContent = `${body.rationale}\n\n${body.sql}\n\nEvidence: ${(body.evidence || []).join(', ')}\nRequest: ${body.requestId}`;
+        toast(`SQL plan generated · ${body.report}`);
+      } catch (error) {
+        $('sqlAnswer').textContent = `SQL copilot error: ${error.message}`;
+        toast(`SQL copilot failed: ${error.message}`, true);
+      }
+    });
+  }
+
   function bind() {
     $$('.rail-btn[data-tab]').forEach((button) => button.addEventListener('click', () => setTab(button.dataset.tab)));
     $$('[data-tab-jump]').forEach((button) => button.addEventListener('click', () => setTab(button.dataset.tabJump)));
@@ -257,6 +304,7 @@
   }
 
   async function init() {
+    injectSqlCopilot();
     bind();
     await Promise.allSettled([poll(), loadEvidence(), checkHealth()]);
     state.polling = setInterval(poll, 1300);
