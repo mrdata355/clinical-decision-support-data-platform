@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/clinical-data/product-event.v1.json",
+  "title": "Product Event v1",
+  "description": "De-identified product, content, and integration event envelope.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "event_type",
+    "source_kind",
+    "source_system",
+    "schema_version",
+    "event_ts",
+    "source_updated_at",
+    "ingested_at",
+    "business_key",
+    "source_version",
+    "payload"
+  ],
+  "properties": {
+    "event_id": {"type": "string", "minLength": 8, "maxLength": 128},
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "session_start",
+        "session_end",
+        "search",
+        "tool_view",
+        "tool_start",
+        "tool_complete",
+        "favorite_add",
+        "favorite_remove",
+        "content_view",
+        "integration_launch"
+      ]
+    },
+    "source_kind": {
+      "type": "string",
+      "enum": ["application", "web", "mobile", "content", "integration", "third_party", "business_system"]
+    },
+    "source_system": {"type": "string", "minLength": 2, "maxLength": 100},
+    "schema_version": {"type": "integer", "const": 1},
+    "event_ts": {"type": "string", "format": "date-time"},
+    "source_updated_at": {"type": "string", "format": "date-time"},
+    "ingested_at": {"type": "string", "format": "date-time"},
+    "business_key": {"type": "string", "minLength": 1, "maxLength": 256},
+    "source_version": {"type": "integer", "minimum": 1},
+    "trace_id": {"type": ["string", "null"], "maxLength": 128},
+    "account_token": {"type": ["string", "null"], "maxLength": 128},
+    "user_token": {"type": ["string", "null"], "maxLength": 128},
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "session_id": {"type": ["string", "null"], "maxLength": 128},
+        "tool_id": {"type": ["string", "null"], "maxLength": 128},
+        "content_id": {"type": ["string", "null"], "maxLength": 128},
+        "channel": {"type": ["string", "null"], "maxLength": 64},
+        "country_code": {"type": ["string", "null"], "pattern": "^[A-Za-z]{2}$"},
+        "language_code": {"type": ["string", "null"], "maxLength": 16},
+        "integration_id": {"type": ["string", "null"], "maxLength": 128},
+        "query_token": {"type": ["string", "null"], "maxLength": 256},
+        "completion_id": {"type": ["string", "null"], "maxLength": 128}
+      }
+    }
+  }
+}
