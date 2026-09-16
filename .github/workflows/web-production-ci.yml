@@ -23,6 +23,8 @@ jobs:
           node --check server/http.js
           node --check api/telemetry.js
           node --check api/control.js
+          node --check api/customer-action.js
+          node --check api/sql-bot.js
           node --check api/health.js
           node --check api/evidence.js
           node --check site/app.js
@@ -40,14 +42,29 @@ jobs:
           if (state.reconciliation.status !== 'PASS') throw new Error('reconciliation invariant failed');
           if (!state.evidence.liveRuntime || !state.evidence.clinicalPayloadsSynthetic) throw new Error('proof boundary missing');
           NODE
+      - name: API module smoke load
+        run: |
+          node - <<'NODE'
+          for (const path of [
+            './api/telemetry', './api/control', './api/customer-action', './api/sql-bot',
+            './api/health', './api/evidence'
+          ]) {
+            const handler = require(path);
+            if (typeof handler !== 'function') throw new Error(`${path} did not export a handler`);
+          }
+          NODE
       - name: Verify production console assets
         run: |
+          test -s index.html
           test -s site/index.html
           test -s site/styles.css
           test -s site/app.js
           grep -q '/api/telemetry' site/app.js
           grep -q '/api/control' site/app.js
+          grep -q '/api/customer-action' site/app.js
+          grep -q '/api/sql-bot' site/app.js
           grep -q 'Synthetic clinical workload' site/index.html
+          grep -q 'Clinical Decision Support' index.html
 
   control-plane:
     runs-on: ubuntu-latest
@@ -59,7 +76,76 @@ jobs:
           cache: pip
       - name: Install
         run: pip install -e '.[dev]'
-      - name: Control-plane unit tests
-        run: pytest -q tests/test_control_plane.py
-      - name: Ruff control-plane
-        run: ruff check src/clinical_data_platform/control_plane.py tests/test_control_plane.py
+      - name: Control-plane and MLOps/copilot tests
+        run: pytest -q tests/test_control_plane.py tests/test_mlops_copilot.py
+      - name: Ruff advanced Python surfaces
+        run: |
+          ruff check src/clinical_data_platform/control_plane.py tests/test_control_plane.py
+          ruff check mlops/platform.py copilot/sql_rag.py tests/test_mlops_copilot.py
+      - name: Compile advanced Python surfaces
+        run: python -m compileall -q src/clinical_data_platform/control_plane.py mlops/platform.py copilot/sql_rag.py
+
+  contracts-and-shape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Validate JSON contracts
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          expected = {
+              'contracts/product_event.v1.schema.json',
+              'contracts/clinical_tool.v1.schema.json',
+              'contracts/content.v1.schema.json',
+              'contracts/quality_rating.v1.schema.json',
+          }
+          for name in expected:
+              data = json.loads(Path(name).read_text())
+              assert data['$schema']
+              assert data['title']
+              assert data['type'] == 'object'
+              assert data.get('required')
+              print('validated', name)
+          PY
+      - name: Verify senior architecture anchors
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          required = [
+              'snowflake/production_reference/enterprise_platform.sql',
+              'snowflake/streams_tasks/incremental_processing.sql',
+              'snowflake/procedures/merge_and_reconcile.sql',
+              'snowflake/performance/query_optimization.sql',
+              'dbt/models/schema.yml',
+              'dbt/models/marts/product/fct_search_funnel_daily.sql',
+              'dbt/models/marts/product/fct_integration_health_daily.sql',
+              'dbt/models/marts/product/fct_quality_trust_daily.sql',
+              'dbt/models/marts/product/fct_recommendation_performance_daily.sql',
+              'mlops/model_registry.yml',
+              'mlops/platform.py',
+              'copilot/report_catalog.yml',
+              'copilot/sql_rag.py',
+              'governance/catalog.yml',
+              'lake/clean/clean_contract.yml',
+              'lake/merge/merge_policy.yml',
+              'lake/curated/data_products.yml',
+          ]
+          missing = [name for name in required if not Path(name).is_file() or Path(name).stat().st_size == 0]
+          assert not missing, missing
+          print('architecture anchors', len(required))
+          PY
+      - name: Verify Snowflake continuous-query structures
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          text = Path('snowflake/streams_tasks/incremental_processing.sql').read_text().upper()
+          for token in ['CREATE STREAM', 'CREATE OR REPLACE TASK', 'CREATE OR REPLACE DYNAMIC TABLE', 'TARGET_LAG', 'DT_LIVE_EHR_INTEGRATION', 'DT_CONTINUOUS_PIPELINE_SLO']:
+              assert token in text, token
+          enterprise = Path('snowflake/production_reference/enterprise_platform.sql').read_text().upper()
+          for token in ['CREATE SCHEMA IF NOT EXISTS FEATURES', 'FCT_QUALITY_RATING', 'MODEL_DEPLOYMENT', 'MERGE_PRODUCT_EVENTS']:
+              assert token in enterprise, token
+          PY
