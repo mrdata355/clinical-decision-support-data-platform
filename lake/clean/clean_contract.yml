@@ -1,6 +1,6 @@
-version: 1
+version: 2
 zone: clean
-purpose: contract_validated_normalized_records
+purpose: contract_validated_normalized_deidentified_records
 
 path_convention: >-
   s3://clinical-data-{env}-clean/{domain}/{entity}/event_date={yyyy-mm-dd}/hour={hh}/part-{partition}.parquet
@@ -10,118 +10,119 @@ storage:
   compression: zstd
   overwrite_policy: partition_replace_only_for_same_run
   file_target_mb: 256
+  schema_evolution: additive_only_without_approval
 
 required_metadata:
+  - ingest_run_id
   - event_id
   - business_key
   - source_system
+  - schema_version
   - source_version
   - source_updated_at
   - normalized_at
   - canonical_hash
   - quality_status
+  - transform_version
 
 normalization:
-  strings:
-    trim: true
-    normalize_blank_to_null: true
-  country_code:
-    uppercase: true
-    pattern: '^[A-Z]{2}$'
-    unknown_value: ZZ
-  language_code:
-    lowercase: true
-  timestamps:
-    timezone: UTC
-    reject_naive: true
-  decimals:
-    scale: 2
-    rounding: half_even
+  strings: {trim: true, normalize_blank_to_null: true, unicode_normalization: NFC}
+  country_code: {uppercase: true, pattern: '^[A-Z]{2}$', unknown_value: ZZ}
+  language_code: {lowercase: true}
+  timestamps: {timezone: UTC, reject_naive: true, reject_far_future_minutes: 5}
+  decimals: {default_scale: 6, rounding: half_even}
   identifiers:
     preserve_source_case: false
-    stable_token_fields:
-      - account_token
-      - user_token
-  arrays:
-    sort_when_order_not_semantic: true
-    deduplicate_when_contract_marks_set: true
+    stable_token_fields: [account_token, user_token, organization_token, patient_context_token]
+    direct_identifiers_forbidden: [name, email, phone, address, medical_record_number, npi_raw, patient_id_raw]
+  arrays: {sort_when_order_not_semantic: true, deduplicate_when_contract_marks_set: true}
+  free_text:
+    persist_raw_search_text: false
+    persist_raw_clinical_note_text: false
+    tokenize_search_queries: true
 
 entities:
   product_event:
     business_key: [event_id]
-    required:
-      - event_id
-      - event_type
-      - event_ts
-      - source_updated_at
-      - source_system
-      - source_version
+    contract: contracts/product_event.v1.schema.json
+    required: [event_id, event_type, event_ts, source_updated_at, source_system, source_version, business_key]
     event_type_values:
       - session_start
       - session_end
       - search
+      - search_impression
+      - search_click
       - tool_view
       - tool_start
       - tool_complete
+      - result_copy
+      - result_share
       - favorite_add
       - favorite_remove
       - content_view
+      - guideline_view
+      - decision_aid_view
+      - quality_rating_view
+      - creator_profile_view
+      - cme_content_view
+      - cme_credit_earned
+      - recommendation_impression
+      - recommendation_click
+      - ehr_launch
+      - ehr_autofill
+      - ehr_input_confirmed
+      - ehr_writeback
       - integration_launch
     conditional_rules:
-      tool_view:
-        required: [tool_id, session_id]
-      tool_start:
-        required: [tool_id, session_id]
-      tool_complete:
-        required: [tool_id, session_id, completion_id]
-      search:
-        required: [query_token, session_id]
-      content_view:
-        required: [content_id, session_id]
-      integration_launch:
-        required: [integration_id, tool_id]
+      tool_view: {required: [tool_id, session_id]}
+      tool_start: {required: [tool_id, session_id]}
+      tool_complete: {required: [tool_id, session_id, completion_id]}
+      search_click: {required: [query_token, tool_id, search_result_rank]}
+      quality_rating_view: {required: [tool_id, quality_rating_id]}
+      cme_credit_earned: {required: [content_id, cme_credit_hours]}
+      ehr_autofill: {required: [integration_id, tool_id, autofill_field_count, confidence_band]}
+      ehr_writeback: {required: [integration_id, tool_id, completion_id]}
   clinical_tool:
     business_key: [tool_id]
-    required:
-      - tool_id
-      - tool_slug
-      - tool_name
-      - primary_specialty
-      - publication_status
-      - source_version
-      - source_updated_at
+    contract: contracts/clinical_tool.v1.schema.json
+    required: [tool_id, tool_slug, tool_name, tool_type, primary_specialty, publication_status, source_version, source_updated_at]
+    tool_type_values: [diagnosis, rule_out, prognosis, formula, treatment, algorithm, risk_assessment, drug_dosing, diagnostic_criteria, decision_aid]
     publication_status_values: [draft, review, published, retired]
+    invariants:
+      - quality_rating_overall_between_0_and_10_when_present
+      - tool_slug_unique_among_current_published_tools
+      - published_tool_has_evidence_reference
+      - last_reviewed_at_not_before_first_published_at
   content:
     business_key: [content_id]
-    required:
-      - content_id
-      - content_type
-      - publication_status
-      - source_version
-      - source_updated_at
+    contract: contracts/content.v1.schema.json
+    required: [content_id, content_type, title, publication_status, source_version, source_updated_at]
+    publication_status_values: [draft, review, published, retired]
+  quality_rating:
+    business_key: [rating_id]
+    contract: contracts/quality_rating.v1.schema.json
+    required: [rating_id, tool_id, rating_version, overall_score, scientific_soundness_score, importance_score, usability_feasibility_score, effective_at, source_version, source_updated_at]
+    invariants:
+      - overall_score_between_0_and_10
+      - scientific_soundness_between_0_and_6
+      - importance_between_0_and_3
+      - usability_feasibility_between_0_and_1
+      - component_scores_sum_to_overall_with_tolerance_0_01
   account:
     business_key: [account_token]
-    required:
-      - account_token
-      - source_updated_at
+    required: [account_token, source_updated_at]
+  ehr_integration_event:
+    business_key: [event_id]
+    required: [event_id, integration_id, organization_token, event_type, event_ts, source_updated_at]
+    forbidden: [raw_patient_id, medical_record_number, patient_name, raw_note_text]
 
 quarantine:
   path_convention: >-
     s3://clinical-data-{env}-quarantine/{domain}/{entity}/reason={reason_code}/event_date={yyyy-mm-dd}/run_id={run_id}/
   preserve_original_payload: true
   preserve_validation_errors: true
-  fields:
-    - quarantine_id
-    - run_id
-    - event_id
-    - business_key
-    - reason_code
-    - reason_field
-    - reason_message
-    - source_system
-    - source_updated_at
-    - raw_payload
-    - quarantined_at
+  replay_requires_approval_for_restricted_data: true
+  fields: [quarantine_id, run_id, event_id, business_key, model_name, reason_code, reason_field, reason_message, source_system, source_updated_at, raw_object_uri, raw_record_identifier, quarantined_at]
   reason_codes:
     - contract_validation_failed
     - missing_business_key
@@ -132,13 +133,22 @@ quarantine:
     - invalid_country_code
     - invalid_source_version
     - incompatible_schema_version
+    - direct_identifier_detected
+    - quality_rating_component_mismatch
+    - broken_evidence_reference
+    - scd_ordering_conflict
 
 quality_gates:
-  max_quarantine_ratio: 0.02
+  max_quarantine_ratio: 0.01
   critical_fields_max_null_ratio: 0.0
   duplicate_event_id_ratio: 0.0
   unknown_schema_version_ratio: 0.0
+  direct_identifier_ratio: 0.0
+  orphan_tool_reference_ratio: 0.001
+  orphan_content_reference_ratio: 0.001
+  quality_rating_component_mismatch_ratio: 0.0
   warning_country_unknown_ratio: 0.05
+  warning_late_arrival_ratio: 0.10
 
 lineage:
   retain_raw_object_uri: true
@@ -146,3 +156,5 @@ lineage:
   retain_ingest_run_id: true
   retain_schema_version: true
   retain_transform_version: true
+  retain_contract_version: true
+  retain_quality_rule_version: true
