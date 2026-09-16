@@ -1,0 +1,50 @@
+source: clinical_content_service
+domain: clinical_content
+transport: https_snapshot
+owner: content-engineering
+cadence: daily_plus_incremental
+classification: internal
+
+objects:
+  clinical_tool:
+    key: tool_id
+    schema: contracts/clinical_tool.v1.schema.json
+    required_fields:
+      - tool_id
+      - tool_slug
+      - tool_name
+      - primary_specialty
+      - publication_status
+      - source_version
+      - source_updated_at
+    scd_strategy: type_2
+    precedence: [source_version_desc, source_updated_at_desc]
+  content:
+    key: content_id
+    required_fields:
+      - content_id
+      - content_type
+      - publication_status
+      - source_version
+      - source_updated_at
+    scd_strategy: type_2
+    precedence: [source_version_desc, source_updated_at_desc]
+
+watermark:
+  field: source_updated_at
+  interval: closed_open
+  full_snapshot_schedule: daily
+  incremental_schedule: hourly
+  commit_after_reconciliation: true
+
+quality:
+  max_missing_business_key_ratio: 0
+  max_unknown_publication_status_ratio: 0
+  max_duplicate_current_version_ratio: 0
+  require_monotonic_source_version: true
+
+observability:
+  freshness_slo_minutes: 1440
+  monitor_specialty_distribution: true
+  monitor_publication_status_distribution: true
+  monitor_snapshot_row_count_change_ratio: true
