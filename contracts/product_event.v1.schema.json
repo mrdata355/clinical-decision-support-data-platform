@@ -1,67 +1,54 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schemas.example.org/clinical-data/product-event.v1.json",
-  "title": "Product Event v1",
-  "description": "De-identified product, content, and integration event envelope.",
+  "title": "Clinical Product Event V1",
+  "$comment": "De-identified portfolio event contract for web, mobile, content, CME and EHR-integrated product analytics.",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "event_id",
-    "event_type",
-    "source_kind",
-    "source_system",
-    "schema_version",
-    "event_ts",
-    "source_updated_at",
-    "ingested_at",
-    "business_key",
-    "source_version",
-    "payload"
-  ],
+  "required": ["event_id", "event_type", "source_kind", "source_system", "schema_version", "event_ts", "source_updated_at", "ingested_at", "business_key", "source_version", "payload"],
   "properties": {
     "event_id": {"type": "string", "minLength": 8, "maxLength": 128},
     "event_type": {
       "type": "string",
-      "enum": [
-        "session_start",
-        "session_end",
-        "search",
-        "tool_view",
-        "tool_start",
-        "tool_complete",
-        "favorite_add",
-        "favorite_remove",
-        "content_view",
-        "integration_launch"
-      ]
+      "enum": ["session_start", "session_end", "search", "search_impression", "search_click", "tool_view", "tool_start", "tool_complete", "result_copy", "result_share", "favorite_add", "favorite_remove", "content_view", "guideline_view", "decision_aid_view", "quality_rating_view", "creator_profile_view", "cme_content_view", "cme_credit_earned", "recommendation_impression", "recommendation_click", "ehr_launch", "ehr_autofill", "ehr_input_confirmed", "ehr_writeback", "integration_launch"]
     },
-    "source_kind": {
-      "type": "string",
-      "enum": ["application", "web", "mobile", "content", "integration", "third_party", "business_system"]
-    },
+    "source_kind": {"type": "string", "enum": ["application", "web", "mobile", "content", "integration", "third_party", "business_system"]},
     "source_system": {"type": "string", "minLength": 2, "maxLength": 100},
-    "schema_version": {"type": "integer", "const": 1},
+    "schema_version": {"type": "integer", "minimum": 1},
     "event_ts": {"type": "string", "format": "date-time"},
     "source_updated_at": {"type": "string", "format": "date-time"},
     "ingested_at": {"type": "string", "format": "date-time"},
     "business_key": {"type": "string", "minLength": 1, "maxLength": 256},
     "source_version": {"type": "integer", "minimum": 1},
     "trace_id": {"type": ["string", "null"], "maxLength": 128},
+    "session_id": {"type": ["string", "null"], "maxLength": 128},
     "account_token": {"type": ["string", "null"], "maxLength": 128},
     "user_token": {"type": ["string", "null"], "maxLength": 128},
+    "organization_token": {"type": ["string", "null"], "maxLength": 128},
+    "channel": {"type": ["string", "null"], "enum": [null, "web", "mobile_web", "ios", "android", "ehr", "api", "integration"]},
+    "country_code": {"type": ["string", "null"], "pattern": "^[A-Z]{2}$"},
+    "language_code": {"type": ["string", "null"], "maxLength": 16},
+    "app_version": {"type": ["string", "null"], "maxLength": 64},
+    "experiment_assignments": {"type": "object", "additionalProperties": {"type": "string"}},
     "payload": {
       "type": "object",
       "additionalProperties": true,
       "properties": {
-        "session_id": {"type": ["string", "null"], "maxLength": 128},
-        "tool_id": {"type": ["string", "null"], "maxLength": 128},
-        "content_id": {"type": ["string", "null"], "maxLength": 128},
-        "channel": {"type": ["string", "null"], "maxLength": 64},
-        "country_code": {"type": ["string", "null"], "pattern": "^[A-Za-z]{2}$"},
-        "language_code": {"type": ["string", "null"], "maxLength": 16},
-        "integration_id": {"type": ["string", "null"], "maxLength": 128},
-        "query_token": {"type": ["string", "null"], "maxLength": 256},
-        "completion_id": {"type": ["string", "null"], "maxLength": 128}
+        "tool_id": {"type": ["string", "null"]},
+        "content_id": {"type": ["string", "null"]},
+        "quality_rating_id": {"type": ["string", "null"]},
+        "integration_id": {"type": ["string", "null"]},
+        "query_token": {"type": ["string", "null"]},
+        "search_result_rank": {"type": ["integer", "null"], "minimum": 1},
+        "completion_id": {"type": ["string", "null"]},
+        "result_band": {"type": ["string", "null"], "maxLength": 128},
+        "input_count": {"type": ["integer", "null"], "minimum": 0},
+        "autofill_field_count": {"type": ["integer", "null"], "minimum": 0},
+        "autofill_confirmed_count": {"type": ["integer", "null"], "minimum": 0},
+        "confidence_band": {"type": ["string", "null"], "enum": [null, "high", "medium", "low", "not_applicable"]},
+        "recommendation_model": {"type": ["string", "null"], "maxLength": 128},
+        "recommendation_position": {"type": ["integer", "null"], "minimum": 1},
+        "cme_credit_hours": {"type": ["number", "null"], "minimum": 0}
       }
     }
   }
