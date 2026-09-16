@@ -1,0 +1,112 @@
+version: 1
+runtime:
+  environment_env: APP_ENV
+  demo_mode_env: DEMO_MODE
+  stream_window_minutes_env: STREAM_WINDOW_MINUTES
+  stream_poll_seconds_env: STREAM_POLL_SECONDS
+
+http_defaults:
+  timeout_seconds_env: SOURCE_TIMEOUT_SECONDS
+  page_size_env: SOURCE_PAGE_SIZE
+  max_pages_env: SOURCE_MAX_PAGES
+  auth:
+    type: bearer
+    token_env: SOURCE_API_TOKEN
+  pagination:
+    items_path: [data]
+    next_cursor_path: [meta, next_cursor]
+    cursor_parameter: cursor
+    page_parameter: page
+    page_size_parameter: limit
+  incremental_window:
+    lower_bound_parameter: updated_from
+    upper_bound_parameter: updated_before
+    interval: closed_open
+
+sources:
+  product_events:
+    base_url_env: SOURCE_API_BASE_URL
+    path_env: SOURCE_PRODUCT_EVENTS_PATH
+    default_path: /v1/product-events
+    business_key: event_id
+    updated_at_field: updated_at
+    source_version_field: source_version
+    landing_object: RAW.PRODUCT_EVENT
+    contract: contracts/product_event.v1.schema.json
+  clinical_tools:
+    base_url_env: SOURCE_API_BASE_URL
+    path_env: SOURCE_CLINICAL_TOOLS_PATH
+    default_path: /v1/clinical-tools
+    business_key: tool_id
+    updated_at_field: updated_at
+    source_version_field: source_version
+    landing_object: RAW.CLINICAL_TOOL_SNAPSHOT
+    contract: contracts/clinical_tool.v1.schema.json
+  content:
+    base_url_env: SOURCE_API_BASE_URL
+    path_env: SOURCE_CONTENT_PATH
+    default_path: /v1/content
+    business_key: content_id
+    updated_at_field: updated_at
+    source_version_field: source_version
+    landing_object: RAW.CONTENT_SNAPSHOT
+  accounts:
+    base_url_env: SOURCE_API_BASE_URL
+    path_env: SOURCE_ACCOUNTS_PATH
+    default_path: /v1/accounts
+    business_key: account_id
+    updated_at_field: updated_at
+    source_version_field: source_version
+    landing_object: RAW.ACCOUNT_SNAPSHOT
+  payments:
+    base_url_env: SOURCE_API_BASE_URL
+    path_env: SOURCE_PAYMENTS_PATH
+    default_path: /v1/payments
+    business_key: payment_id
+    updated_at_field: updated_at
+    source_version_field: source_version
+    landing_object: RAW.PAYMENT_EVENT
+
+snowflake:
+  account_env: SNOWFLAKE_ACCOUNT
+  user_env: SNOWFLAKE_USER
+  password_env: SNOWFLAKE_PASSWORD
+  warehouse_env: SNOWFLAKE_WAREHOUSE
+  database_env: SNOWFLAKE_DATABASE
+  role_env: SNOWFLAKE_ROLE
+  query_tag_env: SNOWFLAKE_QUERY_TAG
+  schemas:
+    raw: RAW
+    staging: STAGING
+    core: CORE
+    marts: MARTS
+    ops: OPS
+    governance: GOVERNANCE
+
+airflow:
+  snowflake_connection_id: snowflake_clinical_analytics
+  environment_variable: clinical_data_environment
+  main_dag: clinical_product_data_platform
+  schedule: '*/15 * * * *'
+  watermark_commit_policy: after_quality_reconciliation_and_publish
+
+dbt:
+  project_dir: dbt
+  profiles_dir_env: DBT_PROFILES_DIR
+  target_env: DBT_TARGET
+  layers: [staging, core, marts]
+
+merge_policy:
+  stable_key: business_key
+  stable_event_id: event_id
+  source_version: source_version
+  source_updated_at: source_updated_at
+  newer_version: UPDATE
+  same_event: DUPLICATE
+  lower_version: STALE
+  contract_failure: QUARANTINE
+
+notes:
+  - API paths above are project-owned defaults and are intentionally environment-overridable.
+  - Connected deployment requires the real endpoint contract, network access, grants, and credentials.
+  - Demo mode uses generated records and does not require external credentials.
