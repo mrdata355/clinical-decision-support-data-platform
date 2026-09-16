@@ -1,0 +1,130 @@
+version: 1
+zone: merge
+purpose: deterministic_current_state_and_history
+
+path_convention: >-
+  s3://clinical-data-{env}-merge/{domain}/{entity}/business_date={yyyy-mm-dd}/run_id={run_id}/
+
+ordering:
+  precedence:
+    - source_version_desc
+    - source_updated_at_desc
+    - event_id_desc
+  reject_older_versions: true
+  stable_tie_breaker: event_id
+  arrival_time_is_not_business_precedence: true
+
+entities:
+  product_event:
+    match_key: [event_id]
+    source_version_field: source_version
+    source_updated_at_field: source_updated_at
+    history: append_all_accepted_versions
+    current_state: highest_version_wins
+    outcomes:
+      - inserted
+      - updated
+      - unchanged
+      - duplicate
+      - stale
+      - quarantined
+  clinical_tool:
+    match_key: [tool_id]
+    source_version_field: source_version
+    source_updated_at_field: source_updated_at
+    history: type_2
+    current_state: is_current_flag
+    effective_fields: [valid_from, valid_to, is_current]
+    outcomes:
+      - inserted
+      - version_closed
+      - version_opened
+      - unchanged
+      - stale
+      - quarantined
+  content:
+    match_key: [content_id]
+    source_version_field: source_version
+    source_updated_at_field: source_updated_at
+    history: type_2
+    current_state: is_current_flag
+    effective_fields: [valid_from, valid_to, is_current]
+  account:
+    match_key: [account_token]
+    source_version_field: source_version
+    source_updated_at_field: source_updated_at
+    history: current_only
+    current_state: highest_version_wins
+
+idempotency:
+  event_ledger:
+    key: event_id
+    action_on_seen: duplicate
+    retain_days: 395
+  run_ledger:
+    key: run_id
+    prevent_double_commit: true
+  canonical_hash:
+    algorithm: sha256
+    exclude_fields:
+      - ingested_at
+      - normalized_at
+      - trace_id
+    action_on_equal_hash_same_version: unchanged
+
+transactionality:
+  stage_before_merge: true
+  validate_stage_count: true
+  merge_and_audit_same_transaction: true
+  watermark_commit_after_transaction: true
+  retry_safe: true
+
+reconciliation:
+  terminal_equation: >-
+    source_count = inserted + updated + unchanged + duplicate + stale + quarantined
+  fail_on_unexplained_rows: true
+  controls:
+    - distinct_business_keys
+    - source_target_row_count
+    - canonical_identity_hash
+    - event_type_distribution
+    - specialty_distribution
+    - daily_usage_aggregate
+
+late_arrivals:
+  supported: true
+  default_lookback_days: 7
+  event_time_preserved: true
+  processing_time_never_replaces_event_time: true
+  repartition_affected_dates_only: true
+
+history:
+  clinical_tool:
+    close_existing_when:
+      - incoming_version_is_newer
+      - canonical_hash_changed
+    close_timestamp: incoming_source_updated_at
+    open_timestamp: incoming_source_updated_at
+    preserve_source_version: true
+  content:
+    close_existing_when:
+      - incoming_version_is_newer
+      - canonical_hash_changed
+    close_timestamp: incoming_source_updated_at
+    open_timestamp: incoming_source_updated_at
+
+rollback:
+  retain_pre_merge_snapshot: true
+  snapshot_scope: affected_business_keys
+  write_merge_audit: true
+  merge_audit_fields:
+    - run_id
+    - entity
+    - business_key
+    - event_id
+    - source_version
+    - prior_version
+    - outcome
+    - canonical_hash
+    - prior_hash
+    - merged_at
