@@ -2,29 +2,23 @@ source: web_events
 domain: product
 transport: object_export
 owner: web-platform
-cadence: every_15_minutes
+cadence: every_5_minutes
 classification: pseudonymous
 
 objects:
   web_event:
     key: event_id
     partition_by: [event_date, browser_family]
-    required_fields:
-      - event_id
-      - event_type
-      - event_ts
-      - session_id
-      - source_updated_at
-      - page_category
-    optional_fields:
-      - tool_id
-      - content_id
-      - account_token
-      - user_token
-      - country_code
-      - language_code
-      - referrer_category
-      - experiment_assignments
+    required_fields: [event_id, event_type, event_ts, session_id, source_updated_at, page_category, schema_version]
+    optional_fields: [tool_id, content_id, quality_rating_id, account_token, user_token, country_code, language_code, referrer_category, experiment_assignments, search_result_rank, recommendation_model, recommendation_position]
+    page_categories: [home, all_tools, specialty, tool, guideline, favorites, quality_rating, cme, account, search]
+    event_families:
+      navigation: [session_start, session_end, content_view, guideline_view]
+      search: [search, search_impression, search_click]
+      tool: [tool_view, tool_start, tool_complete, result_copy, result_share, favorite_add, favorite_remove]
+      trust: [quality_rating_view, creator_profile_view]
+      education: [cme_content_view, cme_credit_earned]
+      recommendation: [recommendation_impression, recommendation_click]
 
 watermark:
   field: source_updated_at
@@ -37,15 +31,27 @@ privacy:
   store_raw_search_text: false
   search_field: query_token
   direct_identifiers_allowed: false
+  redact_url_query_parameters: true
+  ip_address_storage: forbidden
 
 quality:
   max_missing_event_id_ratio: 0
   max_missing_event_ts_ratio: 0
   max_missing_session_id_ratio: 0.001
   max_future_event_ratio: 0
+  max_unknown_page_category_ratio: 0.005
+  max_orphan_tool_ratio: 0.001
+  max_orphan_content_ratio: 0.001
+
+reconciliation:
+  controls: [manifest_count, distinct_event_ids, session_count, event_type_distribution, page_category_distribution, tool_completion_count, result_copy_count]
 
 observability:
-  freshness_slo_minutes: 30
+  freshness_slo_minutes: 15
   volume_baseline_days: 28
   monitor_browser_distribution: true
   monitor_event_type_distribution: true
+  monitor_page_category_distribution: true
+  monitor_search_click_through_rate: true
+  monitor_tool_completion_funnel: true
+  monitor_client_error_rate: true
