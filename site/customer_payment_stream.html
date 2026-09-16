@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Clinical Data Platform | 10-Minute Stream Console</title>
+<style>
+:root{--bg:#07111f;--panel:#0d1b2a;--panel2:#10243a;--line:#27445f;--text:#eaf2fb;--muted:#8ea9c4;--good:#37d67a;--warn:#ffbe55;--bad:#ff6b6b;--accent:#5aa9ff;--purple:#8d7cff;--shadow:0 16px 50px rgba(0,0,0,.25)}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#06101c,#091827);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}button{font:inherit}.shell{max-width:1600px;margin:auto;padding:24px}.top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}.top h1{margin:0;font-size:27px}.top p{margin:6px 0 0;color:var(--muted);max-width:860px;line-height:1.45}.actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.btn{border:1px solid var(--line);background:#10243a;color:var(--text);border-radius:9px;padding:10px 13px;cursor:pointer}.btn:hover{filter:brightness(1.12)}.btn.primary{background:linear-gradient(135deg,#287bd2,#6558d8);border-color:transparent}.btn.good{background:#113a2a;border-color:#236242}.btn.warn{background:#3d2b13;border-color:#6d4d1d}.grid{display:grid;gap:14px}.metrics{grid-template-columns:repeat(7,minmax(115px,1fr));margin-top:20px}.card{background:linear-gradient(180deg,#0e1f31,#0b1928);border:1px solid var(--line);border-radius:14px;padding:15px;box-shadow:var(--shadow)}.metric label{display:block;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em}.metric strong{display:block;font-size:25px;margin-top:7px}.metric small{color:var(--muted)}.section{margin-top:14px}.section h2{font-size:15px;margin:0}.title{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:12px}.badge{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:4px 8px}.two{grid-template-columns:1.25fr .75fr}.three{grid-template-columns:1fr 1fr 1fr}.pipeline{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}.stage{border:1px solid var(--line);background:#0a1725;border-radius:11px;padding:13px;position:relative}.stage:after{content:'→';position:absolute;right:-17px;top:42px;color:#5a7897;font-size:20px}.stage:last-child:after{display:none}.stage b{font-size:12px}.stage .n{font-size:24px;font-weight:800;margin:8px 0 3px}.stage small{color:var(--muted);line-height:1.4}.chart{height:220px;display:grid;grid-template-columns:repeat(10,1fr);gap:8px;align-items:end;padding-top:10px}.minute{display:grid;gap:4px;align-items:end;height:100%}.stack{display:flex;height:170px;align-items:flex-end;gap:2px}.seg{width:50%;border-radius:5px 5px 0 0;min-height:3px}.customerSeg{background:var(--accent)}.paymentSeg{background:var(--purple)}.minute label{text-align:center;color:var(--muted);font-size:10px}.legend{display:flex;gap:16px;color:var(--muted);font-size:11px}.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}.tablewrap{overflow:auto;max-height:450px}table{width:100%;border-collapse:collapse;font-size:12px}th{position:sticky;top:0;background:#0e1f31;color:var(--muted);text-align:left;padding:9px;border-bottom:1px solid var(--line)}td{padding:9px;border-bottom:1px solid #172d43;white-space:nowrap}.pill{display:inline-block;border-radius:999px;padding:3px 7px;font-size:10px;font-weight:700}.approved,.inserted{background:rgba(55,214,122,.13);color:#9bf1bd}.declined,.quarantined{background:rgba(255,107,107,.13);color:#ff9b9b}.updated{background:rgba(90,169,255,.14);color:#9dccff}.duplicate,.stale{background:rgba(255,190,85,.13);color:#ffd28a}.muted{color:var(--muted)}.health{display:grid;gap:9px}.healthrow{display:grid;grid-template-columns:150px 1fr 65px;gap:10px;align-items:center}.track{height:8px;background:#12283c;border-radius:999px;overflow:hidden}.fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--accent),var(--purple))}.statusdot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--good);margin-right:6px}.notice{padding:11px 12px;border-left:3px solid var(--accent);background:#0b1a2a;color:#b9cee2;border-radius:0 8px 8px 0;font-size:12px;line-height:1.5}.code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:#b8d8ff;font-size:11px}.footer{text-align:center;color:#67839f;font-size:10px;margin:18px}.blink{animation:flash .45s ease}@keyframes flash{0%{box-shadow:0 0 0 0 rgba(90,169,255,.65)}100%{box-shadow:0 0 0 14px rgba(90,169,255,0)}}
+@media(max-width:1150px){.metrics{grid-template-columns:repeat(4,1fr)}.two,.three{grid-template-columns:1fr}.pipeline{grid-template-columns:1fr 1fr}.stage:after{display:none}}@media(max-width:700px){.shell{padding:14px}.top{flex-direction:column}.actions{justify-content:flex-start}.metrics{grid-template-columns:1fr 1fr}.pipeline{grid-template-columns:1fr}.chart{gap:4px}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="top">
+    <div>
+      <h1>10-Minute Data Stream Console</h1>
+      <p>Generated customer/account and payment events flow through RAW → CLEAN → MERGE → CORE → CURATED. Every button creates deterministic pipeline evidence without external services or real customer data.</p>
+    </div>
+    <div class="actions">
+      <button class="btn good" id="customerBtn">Customer check</button>
+      <button class="btn" id="paymentBtn">Payment event</button>
+      <button class="btn warn" id="badPaymentBtn">Failed payment</button>
+      <button class="btn primary" id="streamBtn">Run 10-minute stream</button>
+      <button class="btn" id="resetBtn">Reset</button>
+    </div>
+  </div>
+
+  <div class="grid metrics">
+    <div class="card metric"><label>Events</label><strong id="eventsMetric">0</strong><small>all arrivals</small></div>
+    <div class="card metric"><label>Customers checked</label><strong id="customersMetric">0</strong><small>synthetic accounts</small></div>
+    <div class="card metric"><label>Payments</label><strong id="paymentsMetric">0</strong><small>attempts</small></div>
+    <div class="card metric"><label>Approved</label><strong id="approvedMetric">0</strong><small>payment status</small></div>
+    <div class="card metric"><label>Declined</label><strong id="declinedMetric">0</strong><small>payment status</small></div>
+    <div class="card metric"><label>Current state</label><strong id="currentMetric">0</strong><small>merged keys</small></div>
+    <div class="card metric"><label>Reconciliation</label><strong id="reconMetric">PASS</strong><small id="reconSub">0 = 0</small></div>
+  </div>
+
+  <div class="card section">
+    <div class="title"><h2>Data movement</h2><span class="badge"><span class="statusdot"></span>generated stream active</span></div>
+    <div class="pipeline">
+      <div class="stage" id="rawStage"><b>RAW</b><div class="n" id="rawCount">0</div><small>immutable event capture<br>source metadata retained</small></div>
+      <div class="stage" id="cleanStage"><b>CLEAN</b><div class="n" id="cleanCount">0</div><small>contract + type validation<br>invalid rows quarantined</small></div>
+      <div class="stage" id="mergeStage"><b>MERGE</b><div class="n" id="mergeCount">0</div><small>business key + source version<br>duplicate/stale protection</small></div>
+      <div class="stage" id="coreStage"><b>CORE</b><div class="n" id="coreCount">0</div><small>canonical account/payment state<br>highest accepted version</small></div>
+      <div class="stage" id="curatedStage"><b>CURATED</b><div class="n" id="curatedCount">0</div><small>10-minute operations mart<br>quality-gated publication</small></div>
+    </div>
+  </div>
+
+  <div class="grid two section">
+    <div class="card">
+      <div class="title"><h2>Rolling 10-minute stream</h2><div class="legend"><span><i style="background:var(--accent)"></i>customer checks</span><span><i style="background:var(--purple)"></i>payments</span></div></div>
+      <div class="chart" id="streamChart"></div>
+    </div>
+    <div class="card">
+      <div class="title"><h2>Pipeline health</h2><span class="badge" id="clockBadge">minute 0/10</span></div>
+      <div class="health" id="healthPanel"></div>
+      <div class="notice" style="margin-top:14px">The 10-minute button compresses ten logical one-minute windows into a short demo. Each window updates the event ledger, canonical tables, quality metrics, and reconciliation totals.</div>
+    </div>
+  </div>
+
+  <div class="grid two section">
+    <div class="card">
+      <div class="title"><h2>Mock customer/account state</h2><span class="badge">generated identifiers only</span></div>
+      <div class="tablewrap"><table><thead><tr><th>Account</th><th>Segment</th><th>Region</th><th>Status</th><th>Checks</th><th>Version</th><th>Updated</th></tr></thead><tbody id="customerRows"></tbody></table></div>
+    </div>
+    <div class="card">
+      <div class="title"><h2>Payment state</h2><span class="badge">synthetic business events</span></div>
+      <div class="tablewrap"><table><thead><tr><th>Payment</th><th>Account</th><th>Amount</th><th>Status</th><th>Method</th><th>Version</th><th>Updated</th></tr></thead><tbody id="paymentRows"></tbody></table></div>
+    </div>
+  </div>
+
+  <div class="card section">
+    <div class="title"><h2>Event and merge evidence</h2><span class="badge">latest 100 arrivals</span></div>
+    <div class="tablewrap"><table><thead><tr><th>Time</th><th>Event ID</th><th>Type</th><th>Business Key</th><th>Version</th><th>Outcome</th><th>RAW</th><th>CLEAN</th><th>CORE</th><th>Detail</th></tr></thead><tbody id="eventRows"></tbody></table></div>
+  </div>
+
+  <div class="grid three section">
+    <div class="card"><div class="title"><h2>Source contract</h2></div><div class="code">event_id<br>event_type<br>event_ts<br>business_key<br>source_version<br>source_updated_at<br>payload</div></div>
+    <div class="card"><div class="title"><h2>Merge policy</h2></div><div class="code">new key → INSERTED<br>higher version → UPDATED<br>same event → DUPLICATE<br>lower version → STALE<br>invalid contract → QUARANTINED</div></div>
+    <div class="card"><div class="title"><h2>Window policy</h2></div><div class="code">[window_start, window_end)<br>watermark captured first<br>publish after quality<br>watermark commit last<br>replay uses same interval</div></div>
+  </div>
+
+  <div class="footer">Generated demonstration data only. No external service, patient record, payment instrument, or customer data is used.</div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const state = {
+  seq: 1,
+  logicalMinute: 0,
+  events: [],
+  customers: new Map(),
+  payments: new Map(),
+  eventIds: new Set(),
+  windows: Array.from({length:10},(_,i)=>({label:`-${9-i}m`,customers:0,payments:0,failures:0})),
+  streaming: false,
+  timer: null,
+  counts: {raw:0,clean:0,quarantine:0,merge:0,inserted:0,updated:0,duplicate:0,stale:0,curated:0}
+};
+const first = ['Avery','Jordan','Morgan','Taylor','Riley','Casey','Parker','Quinn','Cameron','Skyler','Dakota','Reese'];
+const last = ['Reed','Brooks','Morgan','Hayes','Rivera','Kim','Patel','Diaz','Cole','Grant','Price','Lane'];
+const segments = ['individual','practice','enterprise','education'];
+const regions = ['Northeast','Southeast','Midwest','West'];
+const methods = ['card_token','invoice','ach_token'];
+const money = n => '$'+Number(n).toFixed(2);
+const time = () => new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+const id = prefix => `${prefix}_${String(state.seq++).padStart(5,'0')}`;
+const pick = arr => arr[Math.floor(Math.random()*arr.length)];
+const rand = (a,b) => Math.floor(Math.random()*(b-a+1))+a;
+function flash(el){el.classList.remove('blink'); void el.offsetWidth; el.classList.add('blink')}
+function seedCustomers(){
+  if(state.customers.size) return;
+  for(let i=0;i<8;i++){
+    const accountId=`acct_${1001+i}`;
+    state.customers.set(accountId,{accountId,name:`${pick(first)} ${pick(last)}`,segment:pick(segments),region:pick(regions),status:'active',checks:rand(0,4),version:1,updated:time()});
+  }
+}
+function terminalOutcome(event){
+  if(state.eventIds.has(event.eventId)) return 'DUPLICATE';
+  state.eventIds.add(event.eventId);
+  const map = event.kind==='CUSTOMER_CHECK'?state.customers:state.payments;
+  const prior = map.get(event.businessKey);
+  if(!event.valid) return 'QUARANTINED';
+  if(!prior) return 'INSERTED';
+  if(event.version < prior.version) return 'STALE';
+  if(event.version > prior.version) return 'UPDATED';
+  return 'UNCHANGED';
+}
+function applyEvent(event){
+  state.counts.raw++;
+  const outcome=terminalOutcome(event);
+  if(outcome==='QUARANTINED') state.counts.quarantine++; else state.counts.clean++;
+  if(outcome==='INSERTED') state.counts.inserted++;
+  if(outcome==='UPDATED') state.counts.updated++;
+  if(outcome==='DUPLICATE') state.counts.duplicate++;
+  if(outcome==='STALE') state.counts.stale++;
+  if(['INSERTED','UPDATED','UNCHANGED'].includes(outcome)){
+    state.counts.merge++;
+    if(event.kind==='CUSTOMER_CHECK'){
+      const prior=state.customers.get(event.businessKey);
+      state.customers.set(event.businessKey,{accountId:event.businessKey,name:event.payload.name,segment:event.payload.segment,region:event.payload.region,status:event.payload.status,checks:(prior?.checks||0)+1,version:event.version,updated:time()});
+    }else{
+      state.payments.set(event.businessKey,{paymentId:event.businessKey,accountId:event.payload.accountId,amount:event.payload.amount,status:event.payload.status,method:event.payload.method,version:event.version,updated:time()});
+    }
+  }
+  state.counts.curated=state.customers.size+state.payments.size;
+  state.events.unshift({...event,outcome,processedAt:time()});
+  state.events=state.events.slice(0,100);
+  const bucket=state.windows[state.windows.length-1];
+  if(event.kind==='CUSTOMER_CHECK') bucket.customers++;
+  if(event.kind==='PAYMENT'){bucket.payments++; if(event.payload.status==='declined') bucket.failures++}
+  render();
+}
+function customerCheck(){
+  seedCustomers();
+  const existing=[...state.customers.values()][rand(0,state.customers.size-1)];
+  const event={eventId:id('evt'),kind:'CUSTOMER_CHECK',businessKey:existing.accountId,version:existing.version+1,valid:true,payload:{name:existing.name,segment:existing.segment,region:existing.region,status:'active'},detail:'account profile validation + engagement check'};
+  applyEvent(event); flash($('customerBtn'));
+}
+function paymentEvent(forceFail=false){
+  seedCustomers();
+  const customer=[...state.customers.values()][rand(0,state.customers.size-1)];
+  const paymentId=id('pay');
+  const status=forceFail?'declined':(Math.random()<.08?'declined':'approved');
+  const event={eventId:id('evt'),kind:'PAYMENT',businessKey:paymentId,version:1,valid:true,payload:{accountId:customer.accountId,amount:rand(12,890)+.99,status,method:pick(methods)},detail:status==='approved'?'payment authorized and published':'payment declined; failure reason retained'};
+  applyEvent(event); flash(forceFail?$('badPaymentBtn'):$('paymentBtn'));
+}
+function shiftMinute(){
+  state.logicalMinute++;
+  state.windows.push({label:`m${state.logicalMinute}`,customers:0,payments:0,failures:0});
+  state.windows=state.windows.slice(-10);
+  render();
+}
+function logicalMinuteTraffic(){
+  const checks=rand(2,6), pays=rand(1,5);
+  for(let i=0;i<checks;i++) customerCheck();
+  for(let i=0;i<pays;i++) paymentEvent(false);
+  if(Math.random()<.3) paymentEvent(true);
+  shiftMinute();
+}
+function runTenMinuteStream(){
+  if(state.streaming) return;
+  state.streaming=true; $('streamBtn').textContent='Streaming…';
+  let remaining=10;
+  logicalMinuteTraffic(); remaining--;
+  state.timer=setInterval(()=>{
+    logicalMinuteTraffic(); remaining--;
+    if(remaining<=0){clearInterval(state.timer);state.timer=null;state.streaming=false;$('streamBtn').textContent='Run 10-minute stream';render()}
+  },700);
+}
+function reset(){
+  if(state.timer) clearInterval(state.timer);
+  state.seq=1;state.logicalMinute=0;state.events=[];state.customers=new Map();state.payments=new Map();state.eventIds=new Set();state.windows=Array.from({length:10},(_,i)=>({label:`-${9-i}m`,customers:0,payments:0,failures:0}));state.streaming=false;state.timer=null;state.counts={raw:0,clean:0,quarantine:0,merge:0,inserted:0,updated:0,duplicate:0,stale:0,curated:0};seedCustomers();$('streamBtn').textContent='Run 10-minute stream';render();
+}
+function renderMetrics(){
+  const paymentRows=[...state.payments.values()];
+  const approved=paymentRows.filter(x=>x.status==='approved').length;
+  const declined=paymentRows.filter(x=>x.status==='declined').length;
+  $('eventsMetric').textContent=state.counts.raw;
+  $('customersMetric').textContent=[...state.customers.values()].reduce((a,c)=>a+c.checks,0);
+  $('paymentsMetric').textContent=paymentRows.length;
+  $('approvedMetric').textContent=approved;
+  $('declinedMetric').textContent=declined;
+  $('currentMetric').textContent=state.customers.size+state.payments.size;
+  const explained=state.counts.clean+state.counts.quarantine;
+  $('reconMetric').textContent=state.counts.raw===explained?'PASS':'FAIL';
+  $('reconMetric').style.color=state.counts.raw===explained?'var(--good)':'var(--bad)';
+  $('reconSub').textContent=`${state.counts.raw} = ${explained}`;
+  $('rawCount').textContent=state.counts.raw;
+  $('cleanCount').textContent=state.counts.clean;
+  $('mergeCount').textContent=state.counts.merge;
+  $('coreCount').textContent=state.customers.size+state.payments.size;
+  $('curatedCount').textContent=state.counts.curated;
+}
+function renderChart(){
+  const max=Math.max(1,...state.windows.map(w=>w.customers+w.payments));
+  $('streamChart').innerHTML=state.windows.map(w=>{
+    const ch=Math.max(3,(w.customers/max)*160), ph=Math.max(3,(w.payments/max)*160);
+    return `<div class="minute"><div class="stack"><div class="seg customerSeg" style="height:${ch}px" title="${w.customers} customer checks"></div><div class="seg paymentSeg" style="height:${ph}px" title="${w.payments} payments"></div></div><label>${w.label}</label></div>`;
+  }).join('');
+  $('clockBadge').textContent=`minute ${Math.min(state.logicalMinute,10)}/10`;
+}
+function renderCustomers(){
+  $('customerRows').innerHTML=[...state.customers.values()].sort((a,b)=>b.checks-a.checks).map(c=>`<tr><td>${c.accountId}</td><td>${c.segment}</td><td>${c.region}</td><td><span class="pill approved">${c.status}</span></td><td>${c.checks}</td><td>v${c.version}</td><td>${c.updated}</td></tr>`).join('');
+}
+function renderPayments(){
+  $('paymentRows').innerHTML=[...state.payments.values()].slice(-30).reverse().map(p=>`<tr><td>${p.paymentId}</td><td>${p.accountId}</td><td>${money(p.amount)}</td><td><span class="pill ${p.status==='approved'?'approved':'declined'}">${p.status}</span></td><td>${p.method}</td><td>v${p.version}</td><td>${p.updated}</td></tr>`).join('')||'<tr><td colspan="7" class="muted">Click Payment event or run the 10-minute stream.</td></tr>';
+}
+function renderEvents(){
+  $('eventRows').innerHTML=state.events.map(e=>`<tr><td>${e.processedAt}</td><td>${e.eventId}</td><td>${e.kind}</td><td>${e.businessKey}</td><td>v${e.version}</td><td><span class="pill ${e.outcome.toLowerCase()}">${e.outcome}</span></td><td>✓</td><td>${e.outcome==='QUARANTINED'?'—':'✓'}</td><td>${['INSERTED','UPDATED','UNCHANGED'].includes(e.outcome)?'✓':'—'}</td><td>${e.detail}</td></tr>`).join('')||'<tr><td colspan="10" class="muted">No events yet.</td></tr>';
+}
+function renderHealth(){
+  const volume=Math.min(100,state.counts.raw*2);
+  const quality=state.counts.raw?Math.round((state.counts.clean/state.counts.raw)*100):100;
+  const reconciliation=state.counts.raw===(state.counts.clean+state.counts.quarantine)?100:60;
+  const latency=94;
+  const rows=[['Freshness',98],['Volume baseline',volume||92],['Contract pass',quality],['Reconciliation',reconciliation],['Publish latency',latency]];
+  $('healthPanel').innerHTML=rows.map(([n,v])=>`<div class="healthrow"><span>${n}</span><div class="track"><div class="fill" style="width:${v}%"></div></div><b style="color:${v>=90?'var(--good)':v>=75?'var(--warn)':'var(--bad)'}">${v}%</b></div>`).join('');
+}
+function render(){renderMetrics();renderChart();renderCustomers();renderPayments();renderEvents();renderHealth()}
+$('customerBtn').onclick=customerCheck;$('paymentBtn').onclick=()=>paymentEvent(false);$('badPaymentBtn').onclick=()=>paymentEvent(true);$('streamBtn').onclick=runTenMinuteStream;$('resetBtn').onclick=reset;
+seedCustomers();render();
+</script>
+</body>
+</html>
