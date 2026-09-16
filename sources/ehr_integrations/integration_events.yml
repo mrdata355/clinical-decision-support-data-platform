@@ -1,32 +1,47 @@
-source: integration_gateway
+source: ehr_integration_gateway
 domain: integrations
-transport: https_event_export
+transport: smart_on_fhir_event_export
 owner: integrations-engineering
-cadence: every_15_minutes
-classification: pseudonymous
+cadence: every_5_minutes
+classification: restricted
+reference_scope: public_ehr_product_concepts_only
+
+privacy_boundary:
+  analytics_payloads_deidentified: true
+  direct_patient_identifiers_allowed: false
+  raw_fhir_resource_persistence_in_analytics: false
+  patient_context_tokenization_required: true
+  note_text_persistence_allowed: false
 
 objects:
-  integration_launch:
+  ehr_launch:
     key: event_id
-    required_fields:
-      - event_id
-      - integration_id
-      - tool_id
-      - event_ts
-      - source_updated_at
-      - source_version
-    optional_fields:
-      - account_token
-      - user_token
-      - launch_context
-      - channel
-      - country_code
+    required_fields: [event_id, integration_id, organization_token, tool_id, event_ts, source_updated_at, source_version]
+    optional_fields: [account_token, user_token, patient_context_token, launch_context, channel, ehr_vendor_family, fhir_version]
+  intelligent_autofill:
+    key: event_id
+    required_fields: [event_id, integration_id, organization_token, tool_id, event_ts, source_updated_at, source_version, autofill_field_count]
+    optional_fields: [confirmed_field_count, low_confidence_field_count, confidence_band, fhir_resource_types]
+    allowed_resource_types: [Patient, Encounter, Observation, Condition, MedicationRequest, Procedure, DiagnosticReport]
+  suggested_calc_impression:
+    key: event_id
+    required_fields: [event_id, integration_id, organization_token, tool_id, event_ts, source_updated_at]
+    optional_fields: [suggestion_rule_id, suggestion_rank, accepted]
+  result_writeback:
+    key: event_id
+    required_fields: [event_id, integration_id, organization_token, tool_id, completion_id, event_ts, source_updated_at]
+    optional_fields: [writeback_status, documentation_template_id, latency_ms]
+  integration_health:
+    key: event_id
+    required_fields: [event_id, integration_id, organization_token, event_ts, source_updated_at, health_status]
+    optional_fields: [latency_ms, http_status, error_class]
 
 watermark:
   field: source_updated_at
   interval: closed_open
   commit_after_reconciliation: true
   replay_supported: true
+  late_arrival_lookback_hours: 24
 
 idempotency:
   stable_event_id_required: true
@@ -38,9 +53,25 @@ quality:
   max_missing_integration_id_ratio: 0
   max_missing_tool_id_ratio: 0.001
   max_unknown_schema_version_ratio: 0
+  max_direct_identifier_ratio: 0
+  max_negative_latency_ratio: 0
+  max_orphan_tool_ratio: 0.001
+
+reconciliation:
+  controls:
+    - launch_event_count
+    - autofill_event_count
+    - autofill_fields_sum
+    - confirmed_fields_sum
+    - writeback_event_count
+    - integration_error_count
+    - distinct_organization_count
 
 observability:
-  freshness_slo_minutes: 30
+  freshness_slo_minutes: 15
   monitor_launches_by_integration: true
-  monitor_success_failure_ratio: true
+  monitor_autofill_confirmation_ratio: true
+  monitor_writeback_success_ratio: true
+  monitor_p95_latency: true
   monitor_source_lag: true
+  monitor_error_class_distribution: true
