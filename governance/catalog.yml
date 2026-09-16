@@ -1,5 +1,7 @@
-version: 1
+version: 2
 platform: clinical_decision_support
+reference_domain: public_clinical_decision_support_product_concepts
+proof_boundary: synthetic_or_deidentified_only
 
 naming:
   databases: UPPER_SNAKE_CASE
@@ -12,179 +14,236 @@ naming:
 
 classifications:
   public:
-    description: Publicly distributable metadata.
+    description: Public metadata such as tool title, specialty and publication state.
     retention_days: null
     access: unrestricted
   internal:
-    description: Internal operational and analytical data without direct personal identifiers.
+    description: Operational, editorial, quality and product analytics without direct identifiers.
     retention_days: 730
     access: authenticated
   pseudonymous:
-    description: Tokenized account or user identifiers that require restricted analytical access.
+    description: Tokenized account/user/session identifiers for governed analytics.
     retention_days: 395
     access: restricted_analytics
   restricted:
-    description: Highly sensitive data requiring explicit approval and additional controls.
+    description: Sensitive integration metadata requiring explicit approval and audited access.
     retention_days: 90
     access: need_to_know
 
 policies:
-  - id: immutable_raw
-    description: Raw landing records are append-only and retain source metadata.
+  immutable_raw:
     applies_to: [RAW]
-    requirements:
-      - ingest_run_id_required
-      - source_system_required
-      - source_updated_at_required
-      - payload_hash_required
-      - no_in_place_business_updates
-  - id: deterministic_merge
-    description: Current-state writes use stable keys and source-version ordering.
+    requirements: [ingest_run_id_required, source_system_required, source_updated_at_required, payload_hash_required, no_in_place_business_updates]
+  no_phi_product_telemetry:
+    applies_to: [RAW.PRODUCT_EVENT, STAGING.PRODUCT_EVENT, CORE.FCT_PRODUCT_EVENT, MART]
+    requirements: [tokenize_user_and_account_ids, reject_direct_patient_identifiers, no_free_text_search_storage, no_raw_ehr_payload_in_analytics]
+  deterministic_merge:
     applies_to: [STAGING, CORE]
-    requirements:
-      - business_key_required
-      - source_version_required
-      - source_updated_at_required
-      - stale_update_rejection
-      - duplicate_event_id_protection
-  - id: publish_after_reconciliation
-    description: Serving models are released only after quality and reconciliation gates pass.
+    requirements: [business_key_required, source_version_required, source_updated_at_required, stale_update_rejection, duplicate_event_id_protection]
+  evidence_provenance:
+    applies_to: [CORE.DIM_CLINICAL_TOOL, CORE.DIM_CONTENT, CORE.FCT_QUALITY_RATING]
+    requirements: [source_version, reviewed_at, evidence_reference_lineage, publication_status, provenance_hash]
+  publish_after_reconciliation:
     applies_to: [MART]
-    requirements:
-      - data_quality_pass
-      - source_target_reconciliation_pass
-      - lineage_registered
-      - freshness_within_slo
-  - id: watermark_commit
-    description: Source progress advances only after durable downstream publication.
+    requirements: [data_quality_pass, source_target_reconciliation_pass, lineage_registered, freshness_within_slo]
+  watermark_commit:
     applies_to: [OPS.WATERMARK]
-    requirements:
-      - raw_write_complete
-      - canonical_merge_complete
-      - reconciliation_complete
-      - serving_publish_complete
+    requirements: [raw_write_complete, canonical_merge_complete, reconciliation_complete, serving_publish_complete]
+  llm_sql_guardrails:
+    applies_to: [AI.SQL_COPILOT]
+    requirements: [select_only, approved_semantic_models_only, no_direct_identifiers, row_limit_required, query_timeout_required, query_tag_required]
+  ml_non_clinical_scope:
+    applies_to: [MLOPS]
+    requirements: [no_patient_diagnosis_target, no_treatment_recommendation_target, deidentified_training_features, registered_training_snapshot, bias_and_drift_monitoring]
+
+owners:
+  data_platform: {team: data-platform, pager: platform-oncall}
+  product_analytics: {team: product-analytics, pager: analytics-oncall}
+  content_data: {team: content-data, pager: content-data-oncall}
+  clinical_quality: {team: clinical-quality, pager: quality-oncall}
+  integrations: {team: integrations-engineering, pager: integrations-oncall}
+  ml_platform: {team: ml-platform, pager: ml-oncall}
 
 assets:
   RAW.PRODUCT_EVENT:
-    owner: data-platform
+    owner: data_platform
     domain: product
     classification: pseudonymous
     grain: one_row_per_raw_arrival
     primary_key: [RAW_ID]
     natural_keys: [EVENT_ID]
     freshness_slo_minutes: 20
-    retention_days: 90
-    tags: [raw, events, replayable]
+    tags: [raw, events, replayable, no_phi]
   RAW.CLINICAL_TOOL_SNAPSHOT:
-    owner: content-data
+    owner: content_data
     domain: clinical_content
     classification: internal
-    grain: one_row_per_ingest_run_and_source_tool
+    grain: one_row_per_ingest_run_and_tool
     primary_key: [INGEST_RUN_ID, SOURCE_TOOL_ID]
     freshness_slo_minutes: 1440
-    retention_days: 395
-    tags: [raw, catalog]
+    tags: [raw, tool_catalog, evidence]
   RAW.CONTENT_SNAPSHOT:
-    owner: content-data
-    domain: content
+    owner: content_data
+    domain: clinical_content
     classification: internal
     grain: one_row_per_ingest_run_and_content_id
     primary_key: [INGEST_RUN_ID, SOURCE_CONTENT_ID]
     freshness_slo_minutes: 1440
-    retention_days: 395
-    tags: [raw, content]
+    tags: [raw, guideline, cme, editorial]
+  RAW.QUALITY_RATING_SNAPSHOT:
+    owner: clinical_quality
+    domain: clinical_quality
+    classification: internal
+    grain: one_row_per_ingest_run_tool_rating_version
+    primary_key: [INGEST_RUN_ID, RATING_ID]
+    freshness_slo_minutes: 1440
+    tags: [raw, quality_rating, evidence, fairness]
+  RAW.EHR_INTEGRATION_EVENT:
+    owner: integrations
+    domain: integrations
+    classification: restricted
+    grain: one_row_per_deidentified_integration_event
+    primary_key: [RAW_ID]
+    freshness_slo_minutes: 15
+    tags: [raw, ehr, fhir, deidentified]
   STAGING.PRODUCT_EVENT:
-    owner: data-platform
+    owner: data_platform
     domain: product
     classification: pseudonymous
     grain: one_row_per_highest_observed_event_version
     primary_key: [EVENT_ID]
     freshness_slo_minutes: 30
-    retention_days: 120
-    tags: [staging, normalized]
+    tags: [staging, normalized, idempotent]
   CORE.DIM_CLINICAL_TOOL:
-    owner: content-data
+    owner: content_data
     domain: clinical_content
     classification: internal
     grain: one_row_per_tool_version
     primary_key: [CLINICAL_TOOL_KEY]
     business_key: [TOOL_ID]
     freshness_slo_minutes: 1440
-    retention_days: null
-    tags: [core, dimension, scd]
+    tags: [core, dimension, scd2, evidence]
   CORE.DIM_CONTENT:
-    owner: content-data
-    domain: content
+    owner: content_data
+    domain: clinical_content
     classification: internal
     grain: one_row_per_content_version
     primary_key: [CONTENT_KEY]
     business_key: [CONTENT_ID]
     freshness_slo_minutes: 1440
-    retention_days: null
-    tags: [core, dimension, scd]
+    tags: [core, dimension, scd2, guideline, cme]
+  CORE.DIM_SPECIALTY:
+    owner: content_data
+    domain: taxonomy
+    classification: public
+    grain: one_row_per_specialty
+    primary_key: [SPECIALTY_KEY]
+    business_key: [SPECIALTY_SLUG]
+    freshness_slo_minutes: 1440
+    tags: [core, taxonomy]
   CORE.DIM_ACCOUNT:
-    owner: data-platform
+    owner: data_platform
     domain: identity
     classification: pseudonymous
     grain: one_row_per_account_token
     primary_key: [ACCOUNT_KEY]
     business_key: [ACCOUNT_TOKEN]
     freshness_slo_minutes: 60
-    retention_days: 395
-    tags: [core, dimension]
+    tags: [core, dimension, tokenized]
   CORE.FCT_PRODUCT_EVENT:
-    owner: data-platform
+    owner: data_platform
     domain: product
     classification: pseudonymous
     grain: one_row_per_event_id
     primary_key: [EVENT_ID]
     freshness_slo_minutes: 30
-    retention_days: 395
-    tags: [core, fact]
+    tags: [core, fact, behavior]
+  CORE.FCT_QUALITY_RATING:
+    owner: clinical_quality
+    domain: clinical_quality
+    classification: internal
+    grain: one_row_per_tool_rating_version
+    primary_key: [RATING_KEY]
+    business_key: [RATING_ID]
+    freshness_slo_minutes: 1440
+    tags: [core, fact, quality_rating, fairness]
+  CORE.FCT_CME_ACTIVITY:
+    owner: product_analytics
+    domain: education
+    classification: pseudonymous
+    grain: one_row_per_cme_activity_event
+    primary_key: [EVENT_ID]
+    freshness_slo_minutes: 60
+    tags: [core, fact, cme]
   MART.TOOL_ENGAGEMENT_DAILY:
-    owner: analytics
+    owner: product_analytics
     domain: product
     classification: internal
     grain: one_row_per_date_tool_channel_country
     primary_key: [EVENT_DATE, CLINICAL_TOOL_KEY, CHANNEL, COUNTRY_CODE]
     freshness_slo_minutes: 60
-    retention_days: null
-    tags: [mart, product, business_facing]
+    tags: [mart, product, funnel]
+  MART.SEARCH_FUNNEL_DAILY:
+    owner: product_analytics
+    domain: discovery
+    classification: internal
+    grain: one_row_per_date_query_token_channel
+    freshness_slo_minutes: 60
+    tags: [mart, search, ranking]
+  MART.QUALITY_TRUST_DAILY:
+    owner: clinical_quality
+    domain: clinical_quality
+    classification: internal
+    grain: one_row_per_date_tool
+    freshness_slo_minutes: 120
+    tags: [mart, quality_rating, tool_usage]
+  MART.CME_ENGAGEMENT_DAILY:
+    owner: product_analytics
+    domain: education
+    classification: internal
+    grain: one_row_per_date_content_specialty
+    freshness_slo_minutes: 120
+    tags: [mart, cme]
+  MART.EHR_INTEGRATION_DAILY:
+    owner: integrations
+    domain: integrations
+    classification: internal
+    grain: one_row_per_date_organization_integration
+    freshness_slo_minutes: 30
+    tags: [mart, ehr, autofill, writeback]
   OPS.PIPELINE_RUN:
-    owner: data-platform
+    owner: data_platform
     domain: platform
     classification: internal
     grain: one_row_per_pipeline_run
     primary_key: [RUN_ID]
     freshness_slo_minutes: 5
-    retention_days: 395
     tags: [ops, audit]
   OPS.RECONCILIATION_RESULT:
-    owner: data-platform
+    owner: data_platform
     domain: platform
     classification: internal
     grain: one_row_per_run_and_control
     primary_key: [RUN_ID, CONTROL_NAME]
     freshness_slo_minutes: 5
-    retention_days: 395
     tags: [ops, quality]
+  OPS.MODEL_RUN:
+    owner: ml_platform
+    domain: mlops
+    classification: internal
+    grain: one_row_per_model_training_or_scoring_run
+    primary_key: [MODEL_RUN_ID]
+    freshness_slo_minutes: 30
+    tags: [ops, mlops, lineage]
 
 lineage:
-  - from: RAW.PRODUCT_EVENT
-    to: STAGING.PRODUCT_EVENT
-    transformation: schema_validation_normalization_version_dedupe
-  - from: RAW.CLINICAL_TOOL_SNAPSHOT
-    to: CORE.DIM_CLINICAL_TOOL
-    transformation: catalog_conformance_version_resolution
-  - from: RAW.CONTENT_SNAPSHOT
-    to: CORE.DIM_CONTENT
-    transformation: content_conformance_version_resolution
-  - from: STAGING.PRODUCT_EVENT
-    to: CORE.FCT_PRODUCT_EVENT
-    transformation: dimension_resolution_deterministic_merge
-  - from: CORE.DIM_CLINICAL_TOOL
-    to: CORE.FCT_PRODUCT_EVENT
-    transformation: surrogate_key_resolution
-  - from: CORE.FCT_PRODUCT_EVENT
-    to: MART.TOOL_ENGAGEMENT_DAILY
-    transformation: daily_product_aggregation
+  - {from: RAW.PRODUCT_EVENT, to: STAGING.PRODUCT_EVENT, transformation: contract_validation_normalization_version_dedupe}
+  - {from: STAGING.PRODUCT_EVENT, to: CORE.FCT_PRODUCT_EVENT, transformation: dimension_resolution_deterministic_merge}
+  - {from: RAW.CLINICAL_TOOL_SNAPSHOT, to: CORE.DIM_CLINICAL_TOOL, transformation: tool_contract_scd2}
+  - {from: RAW.CONTENT_SNAPSHOT, to: CORE.DIM_CONTENT, transformation: content_contract_scd2}
+  - {from: RAW.QUALITY_RATING_SNAPSHOT, to: CORE.FCT_QUALITY_RATING, transformation: rating_validation_version_resolution}
+  - {from: CORE.FCT_PRODUCT_EVENT, to: MART.TOOL_ENGAGEMENT_DAILY, transformation: daily_tool_funnel}
+  - {from: CORE.FCT_PRODUCT_EVENT, to: MART.SEARCH_FUNNEL_DAILY, transformation: search_impression_click_completion_attribution}
+  - {from: CORE.FCT_QUALITY_RATING, to: MART.QUALITY_TRUST_DAILY, transformation: rating_usage_join}
+  - {from: CORE.FCT_CME_ACTIVITY, to: MART.CME_ENGAGEMENT_DAILY, transformation: cme_learning_aggregation}
+  - {from: RAW.EHR_INTEGRATION_EVENT, to: MART.EHR_INTEGRATION_DAILY, transformation: deidentified_autofill_writeback_metrics}
