@@ -1,0 +1,203 @@
+version: 1
+platform: clinical_decision_support_reference
+policy:
+  clinical_boundary: >-
+    Models in this reference implementation optimize product discovery, workflow reliability,
+    integration quality, and platform operations. They do not diagnose disease, prescribe
+    treatment, or replace clinician judgment.
+  direct_identifiers_allowed: false
+  phi_training_payloads_allowed: false
+  point_in_time_correct_features_required: true
+  training_data_lineage_required: true
+  evaluation_before_promotion: true
+  rollback_artifact_required: true
+  shadow_before_full_traffic: true
+
+models:
+  tool_recommendation_ranker:
+    tier: critical_product
+    task: learning_to_rank
+    algorithm_candidates: [lightgbm_lambdarank, xgboost_pairwise, popularity_decay_baseline]
+    prediction: relevance_score_for_clinical_tool_discovery
+    training_grain: one_candidate_tool_per_user_session_request
+    label:
+      name: graded_engagement
+      definition:
+        recommendation_impression: 0
+        recommendation_click: 1
+        tool_start: 2
+        tool_complete: 3
+        favorite_add: 4
+      attribution_window_minutes: 30
+    features:
+      - user_specialty_token
+      - session_recent_tool_categories
+      - session_recent_specialties
+      - query_intent_token
+      - tool_primary_specialty
+      - tool_condition_group
+      - tool_type
+      - tool_quality_rating_band
+      - tool_7d_views
+      - tool_28d_completions
+      - user_tool_recency_days
+      - user_tool_frequency_28d
+      - channel
+      - country_code
+      - recommendation_position_prior
+      - hour_of_day_utc
+    exclusions: [patient_diagnosis, patient_labs, raw_ehr_note, direct_identifier]
+    split:
+      strategy: time_based
+      train_days: 90
+      validation_days: 14
+      test_days: 14
+      leakage_gap_hours: 24
+    metrics:
+      primary: ndcg_at_10
+      secondary: [map_at_10, recall_at_10, calibration_by_specialty, ctr, completion_rate]
+    promotion_gates:
+      ndcg_at_10_min: 0.72
+      relative_ndcg_lift_vs_baseline_min: 0.03
+      max_specialty_ndcg_gap: 0.12
+      online_ctr_regression_max: 0.02
+
+  search_intent_router:
+    tier: important_product
+    task: multiclass_classification
+    algorithm_candidates: [lightgbm_multiclass, logistic_regression, linear_svm]
+    prediction: normalized_search_intent_class
+    classes: [tool_name, condition, specialty, guideline, drug_or_dose, score_acronym, unknown]
+    training_grain: one_search_event
+    label:
+      source: downstream_clicked_or_started_entity_category
+      weak_supervision_allowed: true
+    features:
+      - hashed_query_ngrams
+      - query_length
+      - acronym_shape
+      - specialty_context
+      - recent_tool_categories
+      - channel
+      - locale
+    exclusions: [raw_search_text_in_long_term_feature_store, direct_identifier]
+    split: {strategy: time_based, train_days: 120, validation_days: 14, test_days: 14}
+    metrics:
+      primary: macro_f1
+      secondary: [weighted_f1, per_class_recall, abstention_rate]
+    promotion_gates:
+      macro_f1_min: 0.86
+      unknown_recall_min: 0.80
+
+  ehr_autofill_confidence:
+    tier: safety_adjacent_workflow
+    task: calibrated_binary_classification
+    algorithm_candidates: [hist_gradient_boosting, logistic_regression_calibrated]
+    prediction: probability_autofilled_field_is_confirmed_by_user
+    training_grain: one_deidentified_autofill_field_attempt
+    label:
+      positive: clinician_confirmed_autofill_value
+      negative: clinician_rejected_or_edited_autofill_value
+    features:
+      - fhir_resource_type
+      - logical_field_type
+      - source_recency_hours
+      - source_cardinality
+      - unit_normalization_status
+      - terminology_match_strength
+      - integration_vendor_class
+      - tool_input_type
+      - prior_field_confirmation_rate
+    exclusions: [raw_patient_value, patient_name, mrn, raw_note_text]
+    split: {strategy: organization_grouped_time_split, train_days: 120, validation_days: 21, test_days: 21}
+    metrics:
+      primary: brier_score
+      secondary: [auroc, precision_at_high_confidence, calibration_error, confirmation_rate_by_field_type]
+    promotion_gates:
+      brier_score_max: 0.12
+      precision_high_confidence_min: 0.97
+      max_field_type_calibration_gap: 0.08
+    serving_policy:
+      confidence_is_advisory: true
+      low_confidence_requires_review: true
+      automatic_clinical_action: false
+
+  content_engagement_propensity:
+    tier: standard_product
+    task: binary_classification
+    algorithm_candidates: [lightgbm, logistic_regression]
+    prediction: probability_content_view_leads_to_deeper_engagement
+    training_grain: one_content_impression
+    label: downstream_content_or_tool_engagement_within_30m
+    features:
+      - content_type
+      - specialty
+      - guideline_society
+      - publication_age_days
+      - user_specialty_token
+      - channel
+      - content_28d_views
+      - content_28d_completion_assists
+    split: {strategy: time_based, train_days: 120, validation_days: 14, test_days: 14}
+    metrics:
+      primary: average_precision
+      secondary: [auroc, log_loss, calibration_error]
+
+  pipeline_anomaly_detector:
+    tier: platform_operations
+    task: unsupervised_anomaly_detection
+    algorithm_candidates: [isolation_forest, robust_zscore_ensemble]
+    prediction: pipeline_run_anomaly_score
+    training_grain: one_pipeline_run
+    features:
+      - source_count
+      - accepted_count
+      - quarantine_ratio
+      - duplicate_ratio
+      - stale_ratio
+      - duration_seconds
+      - p95_source_lag_seconds
+      - reconciliation_failure_count
+      - bytes_scanned
+      - warehouse_queue_seconds
+      - cost_credits
+    split: {strategy: rolling_history, train_days: 60, validation_days: 14}
+    metrics:
+      primary: alert_precision_on_reviewed_incidents
+      secondary: [alert_rate, mean_time_to_detect]
+
+feature_stores:
+  offline:
+    warehouse: CLINICAL_ANALYTICS
+    schema: FEATURES
+    point_in_time_join_key: feature_ts
+  online_reference:
+    interface: FeatureStoreProtocol
+    required_capabilities: [low_latency_lookup, ttl, versioned_feature_sets, audit_logging]
+
+registry:
+  stages: [candidate, shadow, canary, production, retired]
+  artifact_requirements: [model, preprocessing, feature_schema, training_manifest, metrics, git_sha, data_snapshot_id, environment_lock]
+  approval_requirements:
+    critical_product: [ml_owner, data_owner, product_owner]
+    safety_adjacent_workflow: [ml_owner, data_owner, integration_owner, clinical_safety_reviewer]
+
+monitoring:
+  cadences:
+    service_slo: 5_minutes
+    feature_drift: hourly
+    label_metrics: daily
+    performance_by_segment: daily
+    training_data_drift: daily
+  drift:
+    numeric: [psi, wasserstein]
+    categorical: [js_divergence, unseen_category_rate]
+    thresholds:
+      warning: 0.15
+      critical: 0.25
+  segments:
+    - channel
+    - specialty
+    - integration_id
+    - country_code
+    - app_version
