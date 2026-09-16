@@ -1,0 +1,65 @@
+name: web-production-ci
+
+on:
+  push:
+    branches: [main, supercharge-production-control-plane]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  serverless-and-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - name: Validate serverless JavaScript
+        run: |
+          node --check server/platform-engine.js
+          node --check server/http.js
+          node --check api/telemetry.js
+          node --check api/control.js
+          node --check api/health.js
+          node --check api/evidence.js
+          node --check site/app.js
+      - name: Validate Vercel configuration
+        run: python -m json.tool vercel.json > /dev/null
+      - name: Runtime engine smoke test
+        run: |
+          node - <<'NODE'
+          const { engine } = require('./server/platform-engine');
+          const start = engine.snapshot().stages.raw;
+          let state = engine.applyAction('burst', { count: 12 }, 'ci');
+          if (state.stages.raw < start + 12) throw new Error('burst did not process expected events');
+          state = engine.applyAction('replay', {}, 'ci');
+          if (state.outcomes.duplicate < 1) throw new Error('idempotency replay was not detected');
+          if (state.reconciliation.status !== 'PASS') throw new Error('reconciliation invariant failed');
+          if (!state.evidence.liveRuntime || !state.evidence.clinicalPayloadsSynthetic) throw new Error('proof boundary missing');
+          NODE
+      - name: Verify production console assets
+        run: |
+          test -s site/index.html
+          test -s site/styles.css
+          test -s site/app.js
+          grep -q '/api/telemetry' site/app.js
+          grep -q '/api/control' site/app.js
+          grep -q 'Synthetic clinical workload' site/index.html
+
+  control-plane:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install
+        run: pip install -e '.[dev]'
+      - name: Control-plane unit tests
+        run: pytest -q tests/test_control_plane.py
+      - name: Ruff control-plane
+        run: ruff check src/clinical_data_platform/control_plane.py tests/test_control_plane.py

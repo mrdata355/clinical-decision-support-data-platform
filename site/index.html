@@ -1,50 +1,182 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Clinical Data Platform | Interview Operations Console</title>
-<style>
-:root{--bg:#07111f;--panel:#0d1b2a;--line:#27445f;--text:#eaf2fb;--muted:#8ea9c4;--good:#37d67a;--accent:#5aa9ff;--purple:#8d7cff}*{box-sizing:border-box}body{margin:0;background:#07111f;color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.shell{min-height:100vh;display:grid;grid-template-rows:auto auto 1fr}.header{padding:17px 20px;border-bottom:1px solid var(--line);background:#081421;display:flex;justify-content:space-between;gap:16px;align-items:center}.brand h1{font-size:18px;margin:0}.brand p{margin:4px 0 0;color:var(--muted);font-size:12px}.live{font-size:11px;color:#a9e9c2;border:1px solid #285f45;border-radius:999px;padding:6px 9px;background:#0d2b20}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--good);margin-right:6px}.toolbar{padding:10px 20px;border-bottom:1px solid var(--line);background:#0a1826;display:flex;gap:8px;flex-wrap:wrap;align-items:center}.btn{border:1px solid var(--line);background:#10243a;color:var(--text);border-radius:9px;padding:9px 12px;cursor:pointer;font:inherit;font-size:12px}.btn.active{background:linear-gradient(135deg,#287bd2,#6558d8);border-color:transparent}.btn:hover{filter:brightness(1.12)}.spacer{flex:1}.link{color:#b8d8ff;text-decoration:none;font-size:12px}.viewer{position:relative;min-height:900px;background:#07111f}.viewer iframe{display:block;border:0;width:100%;height:calc(100vh - 118px);min-height:900px;background:#07111f}.loading{position:absolute;inset:0;display:grid;place-items:center;background:#07111f;color:var(--muted);z-index:2}.loading.hidden{display:none}.mode{font-size:11px;color:var(--muted);padding:0 5px}.note{position:absolute;right:18px;bottom:18px;max-width:370px;background:rgba(9,24,39,.96);border:1px solid var(--line);border-radius:10px;padding:10px 12px;color:var(--muted);font-size:11px;line-height:1.45;z-index:3}.note b{color:var(--text)}@media(max-width:700px){.header{align-items:flex-start;flex-direction:column}.toolbar{padding:9px 12px}.viewer iframe{height:1000px}.spacer{display:none}.note{position:static;margin:10px}}
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#050914" />
+  <meta name="description" content="Live production evidence console for the Clinical Decision Support Data Platform." />
+  <title>Clinical Decision Support Platform | Production Command Center</title>
+  <link rel="stylesheet" href="/site/styles.css" />
 </head>
 <body>
-<div class="shell">
-  <header class="header">
-    <div class="brand"><h1>Clinical Data Platform — Interview Operations Console</h1><p>Generated evidence environment for Python ingestion, Snowflake merges, dbt models, Airflow orchestration, and stream reliability.</p></div>
-    <div class="live"><span class="dot"></span>generated-data demo ready</div>
-  </header>
-  <nav class="toolbar" aria-label="dashboard mode">
-    <button class="btn active" id="realBtn" type="button">⚡ Real-time stream</button>
-    <button class="btn" id="tenBtn" type="button">10-minute compressed stream</button>
-    <span class="mode" id="modeLabel">Real-time evidence updates every ~280 ms</span>
-    <span class="spacer"></span>
-    <a class="link" id="openLink" href="realtime_stream.html" target="_blank" rel="noopener">Open dashboard directly ↗</a>
-    <a class="link" href="https://github.com/mrdata355/clinical-decision-support-data-platform" target="_blank" rel="noopener">Repository ↗</a>
-  </nav>
-  <main class="viewer">
-    <div class="loading" id="loading">Loading real-time evidence dashboard…</div>
-    <iframe id="demoFrame" title="clinical data platform streaming evidence" src="realtime_stream.html"></iframe>
-    <div class="note"><b>Interview evidence:</b> start the real-time stream and the RAW → CLEAN → MERGE → CORE → CURATED counters, event ledger, canonical account table, throughput, p95 lag, freshness and reconciliation update in seconds. Switch to the 10-minute view for customer checks and payment-state examples.</div>
-  </main>
-</div>
-<script>
-const frame=document.getElementById('demoFrame');
-const loading=document.getElementById('loading');
-const realBtn=document.getElementById('realBtn');
-const tenBtn=document.getElementById('tenBtn');
-const label=document.getElementById('modeLabel');
-const openLink=document.getElementById('openLink');
-function select(mode){
-  const real=mode==='real';
-  realBtn.classList.toggle('active',real);tenBtn.classList.toggle('active',!real);
-  const src=real?'realtime_stream.html':'customer_payment_stream.html';
-  label.textContent=real?'Real-time evidence updates every ~280 ms':'Ten logical one-minute windows compressed into seconds';
-  openLink.href=src;loading.classList.remove('hidden');loading.textContent=real?'Loading real-time evidence dashboard…':'Loading 10-minute stream dashboard…';frame.src=src;
-}
-frame.addEventListener('load',()=>loading.classList.add('hidden'));
-realBtn.addEventListener('click',()=>select('real'));
-tenBtn.addEventListener('click',()=>select('ten'));
-</script>
+  <div class="noise" aria-hidden="true"></div>
+  <div class="shell">
+    <aside class="rail" aria-label="Primary navigation">
+      <div class="rail-brand" title="Clinical Decision Support Platform">CD</div>
+      <button class="rail-btn active" data-tab="overview" title="Overview">01</button>
+      <button class="rail-btn" data-tab="pipeline" title="Pipeline">02</button>
+      <button class="rail-btn" data-tab="evidence" title="Evidence">03</button>
+      <button class="rail-btn" data-tab="architecture" title="Architecture">04</button>
+      <button class="rail-btn" data-tab="controls" title="Controls">05</button>
+      <div class="rail-spacer"></div>
+      <a class="rail-btn rail-link" href="https://github.com/mrdata355/clinical-decision-support-data-platform" target="_blank" rel="noopener" title="Repository">GH</a>
+    </aside>
+
+    <div class="workspace">
+      <header class="topbar">
+        <div>
+          <div class="eyebrow"><span class="eyebrow-line"></span> PRODUCTION EVIDENCE PLANE</div>
+          <h1>Clinical Decision Support <span>Data Platform</span></h1>
+          <p class="subhead">Live Vercel runtime proof + governed synthetic clinical workload. No patient data.</p>
+        </div>
+        <div class="top-actions">
+          <button class="ghost-btn" id="commandBtn" type="button">⌘ Command</button>
+          <button class="health-chip pending" id="healthBtn" type="button"><span class="pulse-dot"></span><span id="healthLabel">Checking runtime</span></button>
+        </div>
+      </header>
+
+      <section class="runtime-strip" aria-label="Live deployment metadata">
+        <div><span>ENV</span><strong id="deployEnv">—</strong></div>
+        <div><span>REGION</span><strong id="deployRegion">—</strong></div>
+        <div><span>COMMIT</span><strong id="deployCommit">—</strong></div>
+        <div><span>REQUEST</span><strong id="requestId">—</strong></div>
+        <div><span>FUNCTION</span><strong id="functionInstance">—</strong></div>
+        <div><span>SERVER COMPUTE</span><strong id="computeMs">—</strong></div>
+      </section>
+
+      <main>
+        <section class="tab-panel active" data-panel="overview">
+          <div class="hero-grid">
+            <article class="hero-card telemetry-card">
+              <div class="panel-head">
+                <div><span class="kicker">LIVE / SERVER-SIDE</span><h2>Mission telemetry</h2></div>
+                <div class="connection-state" id="connectionState"><span></span> CONNECTING</div>
+              </div>
+              <div class="metric-grid">
+                <div class="metric"><span>Events received</span><strong id="metricReceived">0</strong><em>server workload</em></div>
+                <div class="metric"><span>Throughput</span><strong id="metricEps">0.00</strong><em>events / sec</em></div>
+                <div class="metric"><span>p95 pipeline lag</span><strong id="metricLag">0 ms</strong><em>event → curated</em></div>
+                <div class="metric"><span>Freshness</span><strong id="metricFresh">—</strong><em>latest curated</em></div>
+                <div class="metric"><span>Error ratio</span><strong id="metricError">0.00%</strong><em>quarantine + stale</em></div>
+                <div class="metric"><span>SLO state</span><strong id="metricSlo">—</strong><em>runtime health</em></div>
+              </div>
+              <div class="chart-shell">
+                <div class="chart-head"><span>30 SECOND FLOW</span><span class="legend"><i></i> received <i></i> accepted</span></div>
+                <canvas id="flowChart" width="1200" height="280" aria-label="Thirty second event throughput chart"></canvas>
+              </div>
+            </article>
+
+            <article class="hero-card proof-card">
+              <div class="panel-head"><div><span class="kicker">PROOF BOUNDARY</span><h2>What is actually live?</h2></div><span class="verified">VERIFIABLE</span></div>
+              <div class="proof-stack">
+                <div class="proof-row live-proof"><span class="proof-icon">✓</span><div><b>Vercel function execution</b><small>Real request IDs, region, runtime, timing, deployment metadata.</small></div></div>
+                <div class="proof-row live-proof"><span class="proof-icon">✓</span><div><b>Control-plane API</b><small>Start, stop, burst, replay, reconcile, fault and recovery actions execute server-side.</small></div></div>
+                <div class="proof-row live-proof"><span class="proof-icon">✓</span><div><b>Git provenance</b><small>Deployment commit and branch are surfaced from the production runtime.</small></div></div>
+                <div class="proof-row synth-proof"><span class="proof-icon">S</span><div><b>Synthetic clinical workload</b><small>Deliberately generated. No protected health information or real patient payloads.</small></div></div>
+              </div>
+              <div class="proof-footer"><span id="lastSync">Awaiting first sync</span><button class="text-btn" data-tab-jump="evidence">Inspect evidence →</button></div>
+            </article>
+          </div>
+
+          <article class="panel stage-panel">
+            <div class="panel-head">
+              <div><span class="kicker">DATA PLANE</span><h2>RAW → CLEAN → MERGE → CORE → CURATED</h2></div>
+              <span class="mono-tag" id="reconBadge">RECONCILE —</span>
+            </div>
+            <div class="stage-grid">
+              <div class="stage"><div class="stage-top"><span>01</span><b>RAW</b></div><strong id="stageRaw">0</strong><small>immutable event envelope</small><div class="stage-bar"><i id="barRaw"></i></div></div>
+              <div class="stage"><div class="stage-top"><span>02</span><b>CLEAN</b></div><strong id="stageClean">0</strong><small>contract + type validation</small><div class="stage-bar"><i id="barClean"></i></div></div>
+              <div class="stage"><div class="stage-top"><span>03</span><b>MERGE</b></div><strong id="stageMerge">0</strong><small>idempotency + source version</small><div class="stage-bar"><i id="barMerge"></i></div></div>
+              <div class="stage"><div class="stage-top"><span>04</span><b>CORE</b></div><strong id="stageCore">0</strong><small>canonical current state</small><div class="stage-bar"><i id="barCore"></i></div></div>
+              <div class="stage"><div class="stage-top"><span>05</span><b>CURATED</b></div><strong id="stageCurated">0</strong><small>serving data products</small><div class="stage-bar"><i id="barCurated"></i></div></div>
+            </div>
+          </article>
+
+          <div class="lower-grid">
+            <article class="panel">
+              <div class="panel-head"><div><span class="kicker">LATEST EVENTS</span><h2>Trace ledger</h2></div><span class="mono-tag" id="eventCountTag">0 ROWS</span></div>
+              <div class="table-wrap"><table><thead><tr><th>EVENT</th><th>TYPE</th><th>KEY</th><th>VER</th><th>OUTCOME</th><th>LAG</th><th>TRACE</th></tr></thead><tbody id="eventRows"></tbody></table></div>
+            </article>
+            <article class="panel">
+              <div class="panel-head"><div><span class="kicker">CANONICAL STATE</span><h2>Account projection</h2></div><span class="mono-tag">CURRENT VIEW</span></div>
+              <div class="table-wrap"><table><thead><tr><th>ACCOUNT</th><th>CHECKS</th><th>INTERACTIONS</th><th>STATUS</th><th>VERSION</th></tr></thead><tbody id="accountRows"></tbody></table></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="tab-panel" data-panel="pipeline">
+          <article class="panel full-panel">
+            <div class="panel-head"><div><span class="kicker">PIPELINE INTERNALS</span><h2>Outcome matrix + reconciliation</h2></div><button class="primary-btn" data-action="reconcile">Run reconciliation</button></div>
+            <div class="outcome-grid" id="outcomeGrid"></div>
+            <div class="recon-grid">
+              <div><span>SOURCE</span><strong id="reconSource">0</strong></div><div><span>EXPLAINED</span><strong id="reconExplained">0</strong></div><div><span>DIFFERENCE</span><strong id="reconDiff">0</strong></div><div><span>RUNS</span><strong id="reconRuns">0</strong></div>
+            </div>
+            <div class="engineering-note"><b>Senior-level invariant:</b> every RAW event must resolve to exactly one terminal merge outcome—inserted, updated, unchanged, duplicate, stale, or quarantined. The live API computes this invariant on every snapshot.</div>
+          </article>
+        </section>
+
+        <section class="tab-panel" data-panel="evidence">
+          <article class="panel full-panel">
+            <div class="panel-head"><div><span class="kicker">SOURCE PROVENANCE</span><h2>Production evidence manifest</h2></div><a class="primary-btn link-btn" href="https://github.com/mrdata355/clinical-decision-support-data-platform" target="_blank" rel="noopener">Open repository ↗</a></div>
+            <div class="evidence-summary" id="evidenceSummary">Loading live evidence manifest…</div>
+            <div class="asset-grid" id="assetGrid"></div>
+          </article>
+        </section>
+
+        <section class="tab-panel" data-panel="architecture">
+          <article class="panel full-panel architecture-panel">
+            <div class="panel-head"><div><span class="kicker">REFERENCE ARCHITECTURE</span><h2>Enterprise data-platform topology</h2></div><span class="mono-tag">MULTI-LAYER</span></div>
+            <div class="arch-grid">
+              <div class="arch-column"><span class="arch-label">SOURCES</span><div class="arch-node">Application API<small>bounded HTTP extraction</small></div><div class="arch-node">Web / Mobile<small>behavioral event contracts</small></div><div class="arch-node">EHR / Integrations<small>de-identified reference adapters</small></div><div class="arch-node">Business / SaaS<small>operational source patterns</small></div></div>
+              <div class="arch-arrow">›</div>
+              <div class="arch-column"><span class="arch-label">INGEST + CONTROL</span><div class="arch-node accent">Python runtime<small>idempotency / validation / retry</small></div><div class="arch-node accent">Control plane<small>circuit breaker / backpressure / SLO</small></div><div class="arch-node accent">Airflow<small>orchestration + quality gates</small></div></div>
+              <div class="arch-arrow">›</div>
+              <div class="arch-column"><span class="arch-label">WAREHOUSE</span><div class="arch-node purple">Snowflake RAW<small>immutable source preserving</small></div><div class="arch-node purple">STAGING / CORE<small>deterministic merge</small></div><div class="arch-node purple">MARTS / OPS<small>serving + reliability</small></div></div>
+              <div class="arch-arrow">›</div>
+              <div class="arch-column"><span class="arch-label">SERVING</span><div class="arch-node teal">dbt products<small>tested semantic models</small></div><div class="arch-node teal">Analytics / Ops<small>governed consumption</small></div><div class="arch-node teal">Vercel evidence<small>live deployment telemetry</small></div></div>
+            </div>
+          </article>
+        </section>
+
+        <section class="tab-panel" data-panel="controls">
+          <article class="panel full-panel">
+            <div class="panel-head"><div><span class="kicker">CONTROL PLANE</span><h2>Execute runtime actions</h2></div><span class="mono-tag" id="lastActionTag">LAST ACTION —</span></div>
+            <div class="control-grid">
+              <button class="control-card success" data-action="start"><span>▶</span><b>Start stream</b><small>Resume server-side event generation</small></button>
+              <button class="control-card" data-action="stop"><span>Ⅱ</span><b>Pause stream</b><small>Freeze this function instance</small></button>
+              <button class="control-card" data-action="burst"><span>↯</span><b>Inject burst</b><small>Process 32 events immediately</small></button>
+              <button class="control-card" data-action="replay"><span>↺</span><b>Replay duplicate</b><small>Exercise idempotency controls</small></button>
+              <button class="control-card" data-action="reconcile"><span>≡</span><b>Reconcile</b><small>Recompute source-to-outcome invariant</small></button>
+              <button class="control-card danger" data-action="inject_fault"><span>!</span><b>Inject fault</b><small>Degrade latency + quarantine path</small></button>
+              <button class="control-card success" data-action="recover"><span>✓</span><b>Recover</b><small>Return workload to healthy mode</small></button>
+              <button class="control-card warn" data-action="reset"><span>↻</span><b>Reset instance</b><small>Clear warm-instance telemetry state</small></button>
+            </div>
+            <div class="engineering-note"><b>Serverless semantics:</b> warm-instance state is intentionally exposed as such. Durable production state belongs in Snowflake/Postgres/Redis/Kafka—not hidden inside a function process. The UI surfaces the instance ID so you can prove when a cold start occurs.</div>
+          </article>
+        </section>
+      </main>
+
+      <footer>
+        <span>Clinical Decision Support Data Platform</span><span class="footer-sep">/</span><span>de-identified synthetic workload</span><span class="footer-sep">/</span><span id="footerTime">—</span>
+      </footer>
+    </div>
+  </div>
+
+  <dialog id="commandDialog">
+    <div class="command-modal">
+      <div class="command-head"><div><span class="kicker">COMMAND PALETTE</span><h2>Production operations</h2></div><button id="closeCommand" class="icon-btn">×</button></div>
+      <div class="command-list">
+        <button data-action="start"><span>01</span>Start stream<kbd>S</kbd></button>
+        <button data-action="burst"><span>02</span>Inject burst<kbd>B</kbd></button>
+        <button data-action="replay"><span>03</span>Replay duplicate<kbd>D</kbd></button>
+        <button data-action="reconcile"><span>04</span>Run reconciliation<kbd>R</kbd></button>
+        <button data-action="inject_fault"><span>05</span>Inject fault<kbd>F</kbd></button>
+        <button data-action="recover"><span>06</span>Recover<kbd>H</kbd></button>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="/site/app.js" defer></script>
 </body>
 </html>
