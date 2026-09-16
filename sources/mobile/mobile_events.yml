@@ -2,7 +2,7 @@ source: mobile_events
 domain: product
 transport: object_export
 owner: product-engineering
-cadence: every_15_minutes
+cadence: every_5_minutes
 classification: pseudonymous
 
 objects:
@@ -10,39 +10,48 @@ objects:
     key: event_id
     partition_by: [event_date, platform]
     platforms: [ios, android]
-    required_fields:
-      - event_id
-      - event_type
-      - event_ts
-      - session_id
-      - app_version
-      - platform
-      - source_updated_at
-    optional_fields:
-      - tool_id
-      - content_id
-      - account_token
-      - user_token
-      - country_code
-      - language_code
-      - integration_id
+    required_fields: [event_id, event_type, event_ts, session_id, app_version, platform, source_updated_at, schema_version]
+    optional_fields: [tool_id, content_id, quality_rating_id, account_token, user_token, country_code, language_code, integration_id, offline_mode, network_type, recommendation_model, recommendation_position]
+    event_families:
+      discovery: [search, search_impression, search_click, recommendation_impression, recommendation_click]
+      tool: [tool_view, tool_start, tool_complete, result_copy, result_share, favorite_add, favorite_remove, quality_rating_view]
+      content: [content_view, guideline_view, decision_aid_view, creator_profile_view]
+      education: [cme_content_view, cme_credit_earned]
+    offline_replay:
+      supported: true
+      original_event_ts_required: true
+      client_event_id_stable: true
+      source_version_monotonic_per_event: true
 
 watermark:
   field: source_updated_at
   interval: closed_open
-  late_arrival_lookback_hours: 48
+  late_arrival_lookback_hours: 72
   commit_after_reconciliation: true
+
+privacy:
+  direct_identifiers_allowed: false
+  raw_search_text_allowed: false
+  device_ad_id_allowed: false
+  stable_user_token_required_for_account_analytics: true
 
 quality:
   max_missing_event_id_ratio: 0
   max_missing_event_ts_ratio: 0
   max_unknown_platform_ratio: 0
   max_future_event_ratio: 0
+  max_unknown_app_version_ratio: 0.02
   accepted_platforms: [ios, android]
 
+reconciliation:
+  controls: [manifest_count, distinct_event_ids, offline_replay_duplicate_count, tool_completion_count, cme_credit_event_count]
+
 observability:
-  freshness_slo_minutes: 30
+  freshness_slo_minutes: 15
   volume_baseline_days: 28
   alert_on_schema_drift: true
   alert_on_volume_ratio_below: 0.4
   alert_on_volume_ratio_above: 2.5
+  monitor_app_version_adoption: true
+  monitor_offline_replay_lag: true
+  monitor_crash_adjacent_session_drop: true
