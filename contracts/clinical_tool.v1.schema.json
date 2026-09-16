@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/clinical-data/clinical-tool.v1.json",
+  "title": "Clinical Tool Metadata v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tool_id",
+    "tool_slug",
+    "tool_name",
+    "primary_specialty",
+    "publication_status",
+    "source_version",
+    "source_updated_at"
+  ],
+  "properties": {
+    "tool_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "tool_slug": {"type": "string", "minLength": 1, "maxLength": 256},
+    "tool_name": {"type": "string", "minLength": 1, "maxLength": 512},
+    "primary_specialty": {"type": "string", "minLength": 1, "maxLength": 128},
+    "condition_group": {"type": ["string", "null"], "maxLength": 256},
+    "evidence_status": {"type": ["string", "null"], "maxLength": 128},
+    "publication_status": {"type": "string", "enum": ["draft", "review", "published", "retired"]},
+    "first_published_at": {"type": ["string", "null"], "format": "date-time"},
+    "last_reviewed_at": {"type": ["string", "null"], "format": "date-time"},
+    "source_version": {"type": "integer", "minimum": 1},
+    "source_updated_at": {"type": "string", "format": "date-time"},
+    "specialties": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    },
+    "condition_tags": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    }
+  }
+}
