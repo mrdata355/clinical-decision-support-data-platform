@@ -1,0 +1,92 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install
+        run: pip install -e '.[dev]'
+      - name: Lint core Python
+        run: ruff check src tests data_quality reconciliation observability sources
+      - name: Unit tests
+        run: pytest -q
+      - name: Compile Python
+        run: python -m compileall -q src data_quality reconciliation observability sources
+
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Validate JSON contracts
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          files = list(Path('contracts').glob('*.json'))
+          assert files, 'no contracts found'
+          for path in files:
+              data = json.loads(path.read_text())
+              assert data.get('$schema')
+              assert data.get('title')
+              assert data.get('type') == 'object'
+              print('validated', path)
+          PY
+      - name: Verify architecture anchors
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          required = [
+              'src/clinical_data_platform/runtime.py',
+              'src/clinical_data_platform/loaders/snowflake.py',
+              'snowflake/production_reference/enterprise_platform.sql',
+              'airflow/dags/product_data_platform.py',
+              'dbt/dbt_project.yml',
+              'dbt/models/staging/stg_product_events.sql',
+              'dbt/models/core/fct_product_event.sql',
+              'dbt/models/marts/product/fct_tool_engagement_daily.sql',
+              'data_quality/quality_engine.py',
+              'reconciliation/reconcile.py',
+              'observability/health.py',
+              'governance/catalog.yml',
+              'lake/raw/raw_contract.yml',
+              'lake/clean/clean_contract.yml',
+              'lake/merge/merge_policy.yml',
+              'lake/curated/data_products.yml',
+              'site/index.html',
+          ]
+          missing = [p for p in required if not Path(p).exists()]
+          assert not missing, f'missing required assets: {missing}'
+          print('architecture anchors', len(required))
+          PY
+
+  sql-shape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify Snowflake control structures
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          sql = Path('snowflake/production_reference/enterprise_platform.sql').read_text().upper()
+          required = ['CREATE SCHEMA', 'PIPELINE_RUN', 'WATERMARK', 'QUARANTINE_EVENT', 'MERGE INTO', 'CREATE STREAM', 'CREATE TASK', 'RECONCILIATION_RESULT']
+          missing = [token for token in required if token not in sql]
+          assert not missing, missing
+          print('snowflake reference contains', len(required), 'required structures')
+          PY
