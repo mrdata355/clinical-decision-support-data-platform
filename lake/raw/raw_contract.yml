@@ -1,0 +1,135 @@
+version: 1
+zone: raw
+purpose: immutable_source_preservation
+
+path_convention: >-
+  s3://clinical-data-{env}-raw/{source_system}/{source_object}/ingest_date={yyyy-mm-dd}/run_id={run_id}/part-{partition}.jsonl
+
+write_semantics:
+  mode: append_only
+  overwrite: forbidden
+  preserve_duplicates: true
+  preserve_source_order_metadata: true
+  preserve_original_payload: true
+  compression: zstd
+  file_target_mb: 128
+
+required_metadata:
+  - ingest_run_id
+  - source_system
+  - source_object
+  - source_key
+  - source_updated_at
+  - ingested_at
+  - payload_hash
+  - payload
+
+optional_metadata:
+  - source_cursor
+  - source_partition
+  - source_offset
+  - source_file
+  - source_row_number
+  - trace_id
+  - schema_version
+
+sources:
+  product_api:
+    domain: product
+    objects:
+      product_event:
+        key: event_id
+        updated_at: source_updated_at
+        expected_delivery: continuous
+        max_lateness_minutes: 30
+        classification: pseudonymous
+  content_service:
+    domain: content
+    objects:
+      clinical_tool:
+        key: tool_id
+        updated_at: source_updated_at
+        expected_delivery: daily_snapshot
+        classification: internal
+      content:
+        key: content_id
+        updated_at: source_updated_at
+        expected_delivery: daily_snapshot
+        classification: internal
+  integration_gateway:
+    domain: integrations
+    objects:
+      launch_event:
+        key: event_id
+        updated_at: source_updated_at
+        expected_delivery: continuous
+        classification: pseudonymous
+  business_systems:
+    domain: business
+    objects:
+      account_dimension:
+        key: account_token
+        updated_at: source_updated_at
+        expected_delivery: hourly
+        classification: pseudonymous
+
+partitioning:
+  product_event:
+    - ingest_date
+    - ingest_hour
+  clinical_tool:
+    - ingest_date
+  content:
+    - ingest_date
+  account_dimension:
+    - ingest_date
+    - ingest_hour
+
+quality_at_entry:
+  blocking:
+    - bytes_are_readable
+    - payload_is_valid_json_or_declared_file_format
+    - ingest_run_id_present
+    - source_system_present
+    - source_object_present
+  non_blocking:
+    - source_business_key_present
+    - source_updated_at_parseable
+    - source_schema_version_known
+
+retention:
+  hot_days: 30
+  standard_days: 90
+  archive_days: 395
+  deletion_requires:
+    - retention_window_elapsed
+    - no_open_replay_request
+    - no_legal_hold
+    - lineage_archive_complete
+
+replay:
+  source_of_truth: raw
+  preserve_original_ingest_run_id: true
+  assign_replay_run_id: true
+  never_mutate_original_object: true
+  require_reason_code: true
+  reason_codes:
+    - transformation_fix
+    - downstream_recovery
+    - schema_backfill
+    - quality_rule_change
+    - late_arrival_reprocess
+
+controls:
+  - name: object_manifest_count
+    type: row_or_object_count
+    tolerance: 0
+  - name: payload_hash_presence
+    type: not_null_ratio
+    threshold: 1.0
+  - name: source_updated_at_presence
+    type: not_null_ratio
+    threshold: 0.999
+  - name: duplicate_preservation
+    type: lineage
+    expectation: duplicates_are_not_removed_in_raw
