@@ -1,0 +1,61 @@
+source: product_api
+domain: product
+transport: https
+owner: product-engineering
+cadence: continuous_export
+classification: pseudonymous
+
+endpoint:
+  resource: /v1/events/export
+  health_time: /health/time
+  pagination: cursor
+  page_size: 1000
+  timeout_seconds: 30
+  retryable_statuses: [408, 425, 429, 500, 502, 503, 504]
+
+watermark:
+  field: source_updated_at
+  lower_bound: committed
+  upper_bound: capture_before_extract
+  interval: closed_open
+  commit_after:
+    - raw_persisted
+    - clean_quality_passed
+    - canonical_merge_completed
+    - reconciliation_passed
+    - curated_publish_completed
+
+objects:
+  product_event:
+    key: event_id
+    schema: contracts/product_event.v1.schema.json
+    fields:
+      - event_id
+      - event_type
+      - event_ts
+      - source_updated_at
+      - source_version
+      - business_key
+      - session_id
+      - tool_id
+      - content_id
+      - account_token
+      - user_token
+      - channel
+      - country_code
+      - language_code
+      - integration_id
+      - completion_id
+    dedupe:
+      key: event_id
+      precedence: [source_version_desc, source_updated_at_desc]
+
+observability:
+  metrics:
+    - request_latency_seconds
+    - pages_read
+    - records_read
+    - retry_count
+    - source_lag_seconds
+    - duplicate_event_ids
+  freshness_slo_minutes: 20
