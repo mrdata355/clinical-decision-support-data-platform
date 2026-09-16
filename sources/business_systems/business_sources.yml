@@ -1,0 +1,69 @@
+sources:
+  identity_directory:
+    domain: identity
+    cadence: hourly
+    classification: pseudonymous
+    objects:
+      account:
+        key: account_token
+        updated_at: source_updated_at
+        fields:
+          - account_token
+          - account_type
+          - organization_token
+          - country_code
+          - created_at
+          - source_updated_at
+  finance_ledger:
+    domain: finance
+    cadence: daily
+    classification: internal
+    objects:
+      revenue_daily:
+        key: revenue_record_id
+        updated_at: source_updated_at
+        fields:
+          - revenue_record_id
+          - business_date
+          - revenue_category
+          - amount
+          - currency_code
+          - source_updated_at
+  marketing_platform:
+    domain: growth
+    cadence: hourly
+    classification: internal
+    objects:
+      campaign_activity:
+        key: campaign_event_id
+        updated_at: source_updated_at
+        fields:
+          - campaign_event_id
+          - campaign_id
+          - channel
+          - activity_type
+          - activity_ts
+          - source_updated_at
+
+controls:
+  extraction:
+    capture_upper_watermark_first: true
+    interval: closed_open
+    preserve_raw: true
+  merge:
+    version_aware: true
+    late_arrival_supported: true
+    duplicate_protection: true
+  publication:
+    quality_gate_required: true
+    reconciliation_gate_required: true
+    watermark_commit_last: true
+
+observability:
+  freshness_slo_minutes:
+    identity_directory: 180
+    finance_ledger: 1560
+    marketing_platform: 180
+  monitor_row_count_baseline: true
+  monitor_schema_drift: true
+  monitor_null_profile: true
