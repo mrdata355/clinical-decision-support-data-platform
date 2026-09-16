@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/clinical-data/quality-rating.v1.json",
+  "title": "Clinical Tool Quality Rating V1",
+  "$comment": "Reference contract based on MDCalc's publicly described Quality Rating System concepts; not a proprietary/internal schema.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["rating_id", "tool_id", "rating_version", "overall_score", "scientific_soundness_score", "importance_score", "usability_feasibility_score", "effective_at", "source_version", "source_updated_at"],
+  "properties": {
+    "rating_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "tool_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "rating_version": {"type": "string", "minLength": 1, "maxLength": 64},
+    "overall_score": {"type": "number", "minimum": 0, "maximum": 10},
+    "scientific_soundness_score": {"type": "number", "minimum": 0, "maximum": 6},
+    "importance_score": {"type": "number", "minimum": 0, "maximum": 3},
+    "usability_feasibility_score": {"type": "number", "minimum": 0, "maximum": 1},
+    "fairness_equity_status": {"type": "string", "enum": ["not_assessed", "no_known_concern", "limited_evidence", "performance_difference_observed", "disparity_concern"]},
+    "development_study_count": {"type": "integer", "minimum": 0},
+    "external_validation_count": {"type": "integer", "minimum": 0},
+    "guideline_alignment_status": {"type": "string", "enum": ["unknown", "not_addressed", "consistent", "mixed", "not_currently_aligned"]},
+    "society_guidance_refs": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "evidence_refs": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "population_notes": {"type": ["string", "null"], "maxLength": 4000},
+    "limitations": {"type": "array", "items": {"type": "string", "maxLength": 1000}},
+    "effective_at": {"type": "string", "format": "date-time"},
+    "retired_at": {"type": ["string", "null"], "format": "date-time"},
+    "source_version": {"type": "integer", "minimum": 1},
+    "source_updated_at": {"type": "string", "format": "date-time"}
+  }
+}
